@@ -4,7 +4,7 @@
 name: "Force Dependabot Run"
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 jobs:
   trigger:
