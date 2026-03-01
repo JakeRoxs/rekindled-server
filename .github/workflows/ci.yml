@@ -66,15 +66,12 @@ jobs:
       working-directory: ${{github.workspace}}
       run: msbuild /m /p:Configuration=${{env.BUILD_CONFIGURATION}} ${{env.SOLUTION_FILE_PATH}} /t:Restore,Build
 
-    - name: Install libuuid-dev
+    - name: Install uuid development package
       if: matrix.platform == 'linux'
       run: |
         set -euxo pipefail
         sudo apt-get update
-        sudo apt-get install -y software-properties-common
-        sudo add-apt-repository -y universe
-        sudo apt-get update -o Acquire::Retries=3
-        sudo apt-get install -y libuuid-dev
+        sudo apt-get install -y uuid-dev || sudo apt-get install -y libuuid-dev
 
     - name: Build on Linux
       if: matrix.platform == 'linux'
