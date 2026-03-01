@@ -14,6 +14,25 @@ var gRefreshDebugInterval;
 
 var gActivePlayersChart;
 
+// store received game type so we can rebuild title after language switches
+var gCurrentGameType = null;
+
+function updateTitleWithGameType(type) {
+    // grab translated base title (lang.js already applied translation)
+    var base = document.querySelector('[data-i18n="html_title"]');
+    var prefix = base ? base.textContent : "Dark Souls Open Server";
+    var dynamic = `${prefix} - ${type}`;
+    document.title = dynamic;
+    var hdr = document.querySelector('.mdl-layout-title');
+    if (hdr) hdr.textContent = dynamic;
+}
+
+// when language changes, refresh title if we know gameType
+window.addEventListener('lang-updated', () => {
+    if (gCurrentGameType)
+        updateTitleWithGameType(gCurrentGameType);
+});
+
 window.onload = function() 
 {
     onDocumentLoaded();
@@ -129,8 +148,7 @@ function checkAuthState()
 
 function authenticate(username, password)
 {
-    var dialog = document.querySelector("#auth-dialog");   
-    var gameTypeSpan = document.querySelector('#game-type');
+    var dialog = document.querySelector("#auth-dialog");
 
     fetch("/auth", 
     {
@@ -156,7 +174,10 @@ function authenticate(username, password)
         storeAuthToken(data["token"]);
 
         console.log('Request succeeded with JSON response', data);
-        gameTypeSpan.innerHTML = `&nbsp; Server Type: ${data["gameType"]}`;
+
+        // record and display game type
+        gCurrentGameType = data["gameType"];
+        updateTitleWithGameType(gCurrentGameType);
         startDataRefresh();   
     })
     .catch(function (error) 

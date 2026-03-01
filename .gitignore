@@ -78,3 +78,8 @@ result
 /.vscode
 /build
 /out/build/x64-Debug
+
+# Copilot stuff
+AGENTS.md
+copilot-instructions.md
+/.github/skills

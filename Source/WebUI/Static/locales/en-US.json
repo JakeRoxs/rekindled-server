@@ -1,5 +1,5 @@
 {
-  "html_title": "Dark Souls 3 - Open Server",
+  "html_title": "Dark Souls Open Server",
   "login": "Login",
   "login_dialog_content": "You need to login to view this page. <br>The login for this page can be set in your server configuration file.",
   "username": "Username",
@@ -9,7 +9,7 @@
   "message": "Message",
   "send": "Send",
   "cancel": "cancel",
-  "title": "Dark Souls 3 Open Server",
+  "title": "Dark Souls Open Server",
   "logout": "Logout",
   "Statistics": "Statistics",
   "Players": "Players",
@@ -19,7 +19,6 @@
   "Statistic": "Statistic",
   "Value": "Value",
   "Area": "Area",
-  "Players": "Players",
   "send_all_message": "Send All Message",
   "character_name": "Character Name",
   "Soul Level": "Soul Level",
@@ -61,5 +60,6 @@
   "Total (Lifetime)": "Total (Lifetime)",
   "Level": "Level",
   "Source": "Source",
-  "Message": "Message"
+  "Message": "Message",
+  "Add Announcement": "Add Announcement"
 }

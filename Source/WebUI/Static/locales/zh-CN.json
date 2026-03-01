@@ -19,7 +19,6 @@
   "Statistic": "统计项",
   "Value": "数值",
   "Area": "区域",
-  "Players": "玩家",
   "send_all_message": "发送全体消息",
   "character_name": "角色名",
   "Soul Level": "角色等级",
@@ -62,5 +61,6 @@
   "Total (Lifetime)": "总计（生命周期）",
   "Level": "等级",
   "Source": "来源",
-  "Message": "消息"
+  "Message": "消息",
+  "Add Announcement": "添加公告"
 }

@@ -18,7 +18,7 @@ function loadLanguage(lang) {
 		.then(response => {
 			// Check response status
 			if (!response.ok) {
-				throw new Error('Invaid locales file!');
+				throw new Error('Invalid locales file!');
 			}
 			return response.json();
 		})
@@ -45,6 +45,9 @@ function updatePageText(data) {
 		// Ensure the key exists in data, otherwise use the element's original text content
 		element.innerHTML = data[key] || element.textContent;
 	});
+
+	// notify any listeners that translation has been applied
+	window.dispatchEvent(new Event('lang-updated'));
 }
 
 function init(){
