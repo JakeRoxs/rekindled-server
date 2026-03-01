@@ -1,0 +1,9 @@
+# Dependabot configuration for automated dependency updates
+# Documentation: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions" # update workflows and actions used by GitHub Actions
+    directory: "/" # workflows are in the repo root under .github/workflows
+    schedule:
+      interval: "weekly"
