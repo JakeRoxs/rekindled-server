@@ -1,4 +1,4 @@
-FROM ubuntu@sha256:4b1d0c4a2d2aaf63b37111f34eb9fa89fa1bf53dd6e4ca954d47caebca4005c2 AS build
+FROM ubuntu@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e495eff4f9 AS build
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -q -y g++ curl zip unzip tar binutils cmake git yasm libuuid1 uuid-dev uuid-runtime
 
@@ -14,7 +14,7 @@ FROM steamcmd/steamcmd:latest@sha256:8b2511e03bb70483e32572957bcf2da3af19a4ab394
 # Make steamcmd download steam client libraries so we can copy them later.
 RUN steamcmd +login anonymous +quit
 
-FROM ubuntu@sha256:4b1d0c4a2d2aaf63b37111f34eb9fa89fa1bf53dd6e4ca954d47caebca4005c2 AS runtime
+FROM ubuntu@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e495eff4f9 AS runtime
 
 RUN mkdir -p /opt/ds2os/Saved \
     && useradd -r -s /bin/bash -u 1100 ds2os \
