@@ -179,12 +179,14 @@ inline void HandleAreaChange(PlayerState& state, const std::shared_ptr<GameClien
             state.SetCurrentArea(AreaId);
         }
     }
+#ifdef BUILD_DARKSOULS2
     else if constexpr (std::is_same_v<PlayerState, DS2_PlayerState>)
     {
-        // DS2 path: only compiled when PlayerState matches exactly.
-        // DS2_OnlineAreaId will be defined in DS2 builds; in DS3 builds
-        // this branch is ignored entirely so the forward declaration above
-        // (which lacks enum values) is not referenced.
+        // DS2 path: only compiled when PlayerState matches exactly.  We
+        // also guard the whole block with BUILD_DARKSOULS2 so that the
+        // compiler never even parses it when the enum is only forward
+        // declared (as is the case in DS3 builds).  this avoids lookup
+        // errors for AreaIdType::None.
         using AreaIdType = DS2_OnlineAreaId;
         AreaIdType AreaId = static_cast<AreaIdType>(
             state.GetPlayerStatus().player_location().online_area_id());
@@ -195,6 +197,7 @@ inline void HandleAreaChange(PlayerState& state, const std::shared_ptr<GameClien
             state.SetCurrentArea(AreaId);
         }
     }
+    #endif
     else
     {
         // Unknown state type; nothing to do.
