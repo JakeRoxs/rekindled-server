@@ -98,6 +98,15 @@ If you want a quick one-liner to run the server, you can use this. Note that it 
 
 `sudo mkdir -p /opt/ds3os/Saved && sudo chown 1000:1000 /opt/ds3os/Saved && sudo docker run -d -m 2G --restart always --net host --mount type=bind,source=/opt/ds3os/Saved,target=/opt/ds3os/Saved jakeroxs/ds3os:latest`
 
+### Docker Compose example
+A `docker-compose.yml` file is included in the repository root with a simple configuration for running both the game server and (optionally) the master server. To launch the services, run:
+
+```bash
+docker compose up -d
+```
+
+The compose file uses the published images and binds the `Saved` directory to `./Saved` on the host. Adjust ports or remove the master service if you only need the game server.
+
 ## I launch the game but its unable to connect?
 There are a few different causes of this, the simplest one is to make sure you're running as admin, the launcher needs to patch the games memory to get it to connect to the new server, this requires admin privileges.
 
@@ -141,7 +150,7 @@ The nix version stores the configs in `${XDG_CONFIG_HOME:-$HOME/.config}/ds3os`
 ├── Resources/             General resources used for building and packaging - icons/readmes/etc.
 ├── Source/                All source code for the project.
 │   ├── Injector/          This is the DLL that gets injected into the game to provide DS3OS's functionality.
-│   ├── Loader/            Simple winforms app that loads DS3 such that it will connect to a custom server.S3 such that it will connect to a custom server.
+│   ├── Loader/            WinForms launcher that patches the game and starts it with all network traffic redirected to a custom ds3os server.
 │   ├── MasterServer/      NodeJS source code for a simple API server for advertising and listing active servers.
 │   ├── Server/            Source code for the main server.
 │   ├── Server.DarkSouls3/ Source code thats special to dark souls 3 support.
@@ -153,7 +162,7 @@ The nix version stores the configs in `${XDG_CONFIG_HOME:-$HOME/.config}/ds3os`
 ```
 
 # How can I help?
-Check our the issues page, or send me a message for suggestions on what can be done.
+Check out the issues page, or send me a message for suggestions on what can be done.
 
 Right now there are a few server calls we either have stubbed out or returning dummy information, implementing
 them properly, or finding out the format of the data they need to return would be worth while.

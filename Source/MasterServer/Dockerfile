@@ -1,6 +1,34 @@
-FROM docker.io/node:17.6.0-alpine3.14
-COPY . /app
+# Use a stable LTS Node version
+FROM docker.io/node:lts-alpine AS base
+
+# create app directory and switch to it early so we can take advantage of cache
 WORKDIR /app
-RUN npm install;
+
+# copy package definitions first to leverage layer caching
+COPY package*.json ./
+
+# install only production dependencies and clean npm cache
+RUN npm ci --only=production \
+    && npm cache clean --force
+
+# copy the rest of the source tree
+COPY . .
+
+# install curl so the healthcheck can probe the HTTP API
+RUN apk add --no-cache curl
+
+# create an unprivileged user and take ownership of the app directory
+RUN addgroup -S master && adduser -S master -G master \
+    && chown -R master:master /app
+
+USER master
+
+# expose the api port for documentation
 EXPOSE 50020/tcp
+
+# simple healthcheck against the servers endpoint
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:50020/api/v1/servers || exit 1
+
+# run the server via npm script
 ENTRYPOINT ["npm", "run", "start"]

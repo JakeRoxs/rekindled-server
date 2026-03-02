@@ -1,20 +1,30 @@
+# build stage based on ubuntu LTS
 FROM ubuntu@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e495eff4f9 AS build
 
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -q -y g++ curl zip unzip tar binutils cmake git yasm libuuid1 uuid-dev uuid-runtime
+# install build dependencies without recommendations and clean apt cache in same layer
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -q -y --no-install-recommends \
+        g++ make curl zip unzip tar binutils cmake git yasm libuuid1 uuid-dev uuid-runtime && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY ./ /build
 WORKDIR /build/Tools
-RUN ./generate_make_release.sh
+# strip any CRLF bytes from script; host may check out with Windows endings
+RUN sed -i 's/\r$//' ./generate_make_release.sh && \
+    ./generate_make_release.sh
 WORKDIR /build
 RUN cd intermediate/make && make -j$(nproc || echo 4)
 
-# Pull an old version because steamcmd has all kinds of fucked up its folder structure in latest.
 FROM steamcmd/steamcmd:latest@sha256:c374508fe846c0139aea3ddb57e4d32be210cf72ad29e6495f0318506d791c16 AS steam
 
 # Make steamcmd download steam client libraries so we can copy them later.
 RUN steamcmd +login anonymous +quit
 
+# runtime stage – also based on ubuntu LTS; allow STEAM_APP_ID to be overridden
 FROM ubuntu@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e495eff4f9 AS runtime
+
+# default Steam AppID can be overridden with --build-arg STEAM_APP_ID=xxxx
+ARG STEAM_APP_ID=335300
 
 RUN mkdir -p /opt/ds2os/Saved \
     && if ! id ds2os >/dev/null 2>&1; then \
@@ -25,9 +35,20 @@ RUN mkdir -p /opt/ds2os/Saved \
     && chmod 755 /opt/ds2os/Saved \
     && chmod 755 /opt/ds2os \
     && apt update \
-    && apt install -y --reinstall ca-certificates
+    && apt install -y --no-install-recommends --reinstall ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN echo "335300" >> /opt/ds2os/steam_appid.txt
+# expose the various ports the game server uses so operators can easily publish them
+#   50000/udp – DS3 game traffic (also used for quickmatch/arena)
+#   50010/udp – DS2 game traffic
+#   50050/udp – arena transport (DS3)
+# and the HTTP/admin API port
+EXPOSE 50000/udp 50010/udp 50050/udp
+EXPOSE 50005/tcp
+
+# write the AppID from build arg
+ENV STEAM_APP_ID=${STEAM_APP_ID}
+RUN echo "$STEAM_APP_ID" >> /opt/ds2os/steam_appid.txt
 
 COPY --from=build /build/bin/x64_release/ /opt/ds2os/
 COPY --from=steam /root/.local/share/Steam/steamcmd/linux64/steamclient.so /opt/ds2os/steamclient.so
