@@ -201,6 +201,9 @@ jobs:
     - name: Display artifacts
       run: ls -R
 
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
     - name: Publish release via GitHub CLI
       env:
         VERSION_TAG: v${{ env.VERSION_NUMBER }}${{ env.VERSION_NUMBER_POSTFIX }}
