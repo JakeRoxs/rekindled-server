@@ -21,9 +21,130 @@
 #include "Shared/Core/Utils/Logging.h"
 #include "Shared/Core/Utils/Strings.h"
 #include "Shared/Core/Utils/DiffTracker.h"
-#include "Shared/Core/Utils/PlayerDataUtils.h"
+#include "Shared/Game/PlayerDataUtils.h"
 
 #include "Shared/Core/Network/NetConnection.h"
+
+namespace {
+
+void UpdateCharacterId(DS3_PlayerState& state)
+{
+    if (state.GetPlayerStatus().player_status().has_character_id())
+        state.SetCharacterId(state.GetPlayerStatus().player_status().character_id());
+}
+
+void UpdateMatchmakingState(DS3_PlayerState& state)
+{
+    if (!state.GetPlayerStatus().has_player_status())
+        return;
+
+    if (state.GetPlayerStatus().player_status().has_is_invadable())
+    {
+        bool NewState = state.GetPlayerStatus().player_status().is_invadable();
+        if (NewState != state.GetIsInvadable())
+        {
+            VerboseS("", "User is now %s", NewState ? "invadable" : "no longer invadable");
+            state.SetIsInvadable(NewState);
+        }
+    }
+
+    if (state.GetPlayerStatus().player_status().has_soul_level())
+        state.SetSoulLevel(state.GetPlayerStatus().player_status().soul_level());
+
+    if (state.GetPlayerStatus().player_status().has_max_weapon_level())
+        state.SetMaxWeaponLevel(state.GetPlayerStatus().player_status().max_weapon_level());
+}
+
+} // anonymous namespace
+
+// template specialization for DS3
+
+template<>
+inline void HandleAreaChange<DS3_PlayerState>(DS3_PlayerState& state,
+                                               const std::shared_ptr<GameClient>& client)
+{
+    if (!state.GetPlayerStatus().has_player_location())
+        return;
+
+    DS3_OnlineAreaId AreaId = static_cast<DS3_OnlineAreaId>(
+        state.GetPlayerStatus().player_location().online_area_id());
+    if (AreaId != state.GetCurrentArea() && AreaId != DS3_OnlineAreaId::None)
+    {
+        VerboseS(client->GetName().c_str(), "User has entered '%s' (0x%08x)",
+                 GetEnumString(AreaId).c_str(), AreaId);
+        state.SetCurrentArea(AreaId);
+    }
+}
+
+// status clearer specialization for DS3
+
+template<>
+struct StatusClearer<DS3_PlayerState, DS3_Frpg2PlayerData::AllStatus>
+{
+    static void Clear(DS3_PlayerState& state, const DS3_Frpg2PlayerData::AllStatus& status)
+    {
+        if (status.has_player_status() && status.player_status().played_areas_size() > 0)
+        {
+            state.GetPlayerStatus_Mutable().mutable_player_status()->clear_played_areas();
+        }
+        if (status.has_player_status() && status.player_status().unknown_18_size() > 0)
+        {
+            state.GetPlayerStatus_Mutable().mutable_player_status()->clear_unknown_18();
+        }
+        if (status.has_player_status() && status.player_status().anticheat_data_size() > 0)
+        {
+            state.GetPlayerStatus_Mutable().mutable_player_status()->clear_anticheat_data();
+        }
+    }
+};
+
+// bonfire trait specialisations for DS3
+
+template<> struct BonfireEnumFor<DS3_PlayerState> { using type = DS3_BonfireId; };
+
+template<>
+struct BonfireAccessor<DS3_PlayerState>
+{
+    static void Collect(const DS3_PlayerState& state, std::vector<uint32_t>& out)
+    {
+        if (!state.GetPlayerStatus().has_play_data())
+            return;
+        for (int i = 0; i < state.GetPlayerStatus().play_data().bonfire_info_size(); ++i)
+        {
+            const auto& bon = state.GetPlayerStatus().play_data().bonfire_info(i);
+            if (bon.has_been_lit())
+                out.push_back(bon.bonfire_id());
+        }
+    }
+};
+
+// DS3 visitor pool remains free because only DS3 uses it
+
+DS3_Frpg2RequestMessage::VisitorPool DetermineVisitorPool(const DS3_PlayerState& state)
+{
+    DS3_Frpg2RequestMessage::VisitorPool pool = DS3_Frpg2RequestMessage::VisitorPool::VisitorPool_None;
+    if (state.GetPlayerStatus().player_status().has_can_summon_for_way_of_blue() &&
+        state.GetPlayerStatus().player_status().can_summon_for_way_of_blue())
+    {
+        pool = DS3_Frpg2RequestMessage::VisitorPool::VisitorPool_Way_of_Blue;
+    }
+    if (state.GetPlayerStatus().player_status().has_can_summon_for_watchdog_of_farron() &&
+        state.GetPlayerStatus().player_status().can_summon_for_watchdog_of_farron())
+    {
+        pool = DS3_Frpg2RequestMessage::VisitorPool::VisitorPool_Watchdog_of_Farron;
+    }
+    if (state.GetPlayerStatus().player_status().has_can_summon_for_aldritch_faithful() &&
+        state.GetPlayerStatus().player_status().can_summon_for_aldritch_faithful())
+    {
+        pool = DS3_Frpg2RequestMessage::VisitorPool::VisitorPool_Aldrich_Faithful;
+    }
+    if (state.GetPlayerStatus().player_status().has_can_summon_for_spear_of_church() &&
+        state.GetPlayerStatus().player_status().can_summon_for_spear_of_church())
+    {
+        pool = DS3_Frpg2RequestMessage::VisitorPool::VisitorPool_Spear_of_the_Church;
+    }
+    return pool;
+}
 
 DS3_PlayerDataManager::DS3_PlayerDataManager(Server* InServerInstance)
     : ServerInstance(InServerInstance)

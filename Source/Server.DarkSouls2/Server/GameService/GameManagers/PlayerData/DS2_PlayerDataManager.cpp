@@ -21,13 +21,150 @@
 #include "Shared/Core/Utils/Logging.h"
 #include "Shared/Core/Utils/Strings.h"
 #include "Shared/Core/Utils/DiffTracker.h"
-#include "Shared/Core/Utils/PlayerDataUtils.h"
+#include "Shared/Game/PlayerDataUtils.h"
 
 #include "Shared/Core/Network/NetConnection.h"
 
+
+
+namespace {
+
+void UpdateCharacterId(DS2_PlayerState& state)
+{
+    // DS2 doesn’t expose character_id in the status packet.
+    (void)state;
+}
+
+void UpdateMatchmakingState(DS2_PlayerState& state)
+{
+    if (!state.GetPlayerStatus().has_player_status())
+        return;
+
+    bool NewState = true;
+    if (state.GetPlayerStatus().player_status().sitting_at_bonfire() ||
+        state.GetPlayerStatus().player_status().human_effigy_burnt() ||
+        state.GetCurrentOnlineActivityArea() == 0)
+    {
+        NewState = false;
+    }
+
+    if (NewState != state.GetIsInvadable())
+    {
+        VerboseS("", "User is now %s", NewState ? "invadable" : "no longer invadable");
+        state.SetIsInvadable(NewState);
+    }
+
+    if (state.GetPlayerStatus().player_status().has_soul_level())
+        state.SetSoulLevel(state.GetPlayerStatus().player_status().soul_level());
+}
+
+} // anonymous namespace
+
+// DS2-specific template specializations and traits
+
+template<>
+inline void HandleAreaChange<DS2_PlayerState>(DS2_PlayerState& state,
+                                               const std::shared_ptr<GameClient>& client)
+{
+    if (!state.GetPlayerStatus().has_player_location())
+        return;
+
+    using AreaIdType = DS2_OnlineAreaId;
+    AreaIdType AreaId = static_cast<AreaIdType>(
+        state.GetPlayerStatus().player_location().online_area_id());
+    if (AreaId != state.GetCurrentArea() && AreaId != AreaIdType::None)
+    {
+        VerboseS(client->GetName().c_str(), "User has entered '%s' (0x%08x)",
+                 GetEnumString(AreaId).c_str(), AreaId);
+        state.SetCurrentArea(AreaId);
+    }
+
+    if (state.GetPlayerStatus().player_location().has_online_activity_area_id())
+    {
+        int OnlineActivityAreaId = state.GetPlayerStatus().player_location().online_activity_area_id();
+        if (OnlineActivityAreaId != state.GetCurrentOnlineActivityArea())
+        {
+            VerboseS(client->GetName().c_str(),
+                     "User has entered online activity area (0x%08x)",
+                     OnlineActivityAreaId);
+            state.SetCurrentOnlineActivityArea(OnlineActivityAreaId);
+        }
+    }
+}
+
+// status clearer specialization
+
+template<>
+struct StatusClearer<DS2_PlayerState, DS2_Frpg2PlayerData::AllStatus>
+{
+    static void Clear(DS2_PlayerState& state, const DS2_Frpg2PlayerData::AllStatus& status)
+    {
+        if (status.has_player_status() && status.player_status().played_areas_size() > 0)
+        {
+            state.GetPlayerStatus_Mutable().mutable_player_status()->clear_played_areas();
+        }
+        if (status.has_stats_info())
+        {
+            auto* stats = state.GetPlayerStatus_Mutable().mutable_stats_info();
+            stats->clear_bonfire_levels();
+            stats->clear_phantom_type_count_6();
+            stats->clear_phantom_type_count_7();
+            stats->clear_phantom_type_count_8();
+            stats->clear_phantom_type_count_9();
+            stats->clear_unknown_11();
+            stats->clear_unlocked_bonfires();
+            stats->clear_unknown_21();
+        }
+    }
+};
+
+// constructor
 DS2_PlayerDataManager::DS2_PlayerDataManager(Server* InServerInstance)
     : ServerInstance(InServerInstance)
 {
+}
+
+// bonfire trait specialisations for DS2
+
+template<> struct BonfireEnumFor<DS2_PlayerState> { using type = DS2_BonfireId; };
+
+template<>
+struct BonfireAccessor<DS2_PlayerState>
+{
+    static void Collect(const DS2_PlayerState& state, std::vector<uint32_t>& out)
+    {
+        if (!state.GetPlayerStatus().has_stats_info())
+            return;
+        for (int i = 0; i < state.GetPlayerStatus().stats_info().unlocked_bonfires_size(); ++i)
+            out.push_back(state.GetPlayerStatus().stats_info().unlocked_bonfires(i));
+    }
+};
+
+// visitor pool helper stays in this file
+
+DS2_Frpg2RequestMessage::VisitorType DetermineVisitorPool(const DS2_PlayerState& state)
+{
+    DS2_Frpg2RequestMessage::VisitorType pool = DS2_Frpg2RequestMessage::VisitorType::VisitorType_None;
+    if (state.GetPlayerStatus().item_using_info().has_guardians_seal() &&
+        state.GetPlayerStatus().item_using_info().guardians_seal() &&
+        state.GetPlayerStatus().player_status().covenant() == (int)DS2_CovenantId::Blue_Sentinels &&
+        state.GetCurrentOnlineActivityArea() != 0)
+    {
+        pool = DS2_Frpg2RequestMessage::VisitorType::VisitorType_BlueSentinels;
+    }
+    if (state.GetPlayerStatus().item_using_info().has_bell_keepers_seal() &&
+        state.GetPlayerStatus().item_using_info().bell_keepers_seal() &&
+        state.GetPlayerStatus().player_status().covenant() == (int)DS2_CovenantId::Bell_Keepers &&
+        (state.GetCurrentOnlineActivityArea() == 0x18e3e || state.GetCurrentOnlineActivityArea() == 0x18d08))
+    {
+        pool = DS2_Frpg2RequestMessage::VisitorType::VisitorType_BellKeepers;
+    }
+    if (state.GetPlayerStatus().player_status().covenant() != (int)DS2_CovenantId::Rat_King_Covenant &&
+        state.GetCurrentOnlineActivityArea() == 0x193f2)
+    {
+        pool = DS2_Frpg2RequestMessage::VisitorType::VisitorType_Rat;
+    }
+    return pool;
 }
 
 MessageHandleResult DS2_PlayerDataManager::OnMessageReceived(GameClient* Client, const Frpg2ReliableUdpMessage& Message)
