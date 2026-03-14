@@ -9,6 +9,9 @@ services:
       - "50005:50005"     # admin WebUI
     volumes:
       - ./Saved:/opt/ds3os/Saved
+    environment:
+      # Enable sharding mode
+      - SUPPORT_SHARDING=true
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL","curl -fsS http://localhost:50005/ || exit 1"]

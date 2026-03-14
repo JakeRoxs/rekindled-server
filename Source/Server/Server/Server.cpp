@@ -28,6 +28,9 @@
 #include <thread>
 #include <chrono>
 #include <fstream>
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
 
 #include "ThirdParty/nlohmann/json.hpp"
 #include <openssl/rsa.h>
@@ -114,6 +117,23 @@ bool Server::Init()
             return false;
         }
     }
+
+    // Allow runtime overrides via environment variables (useful when running in containers).
+    // This prevents having to modify the JSON config file for simple toggles.
+    auto ReadBoolEnv = [](const char* Name, bool DefaultValue) {
+        const char* Value = std::getenv(Name);
+        if (!Value)
+        {
+            return DefaultValue;
+        }
+
+        std::string Str = Value;
+        std::transform(Str.begin(), Str.end(), Str.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return (Str == "1" || Str == "true" || Str == "yes" || Str == "on");
+    };
+
+    // When running in docker-compose, users can enable sharding via an environment variable.
+    Config.SupportSharding = ReadBoolEnv("SUPPORT_SHARDING", Config.SupportSharding);
 
     // Disable all but error messages if configured.
     if (Config.QuietLogging)
@@ -509,7 +529,7 @@ void Server::Poll()
     // Write last activity time periodically to disk to keep this server instance alive.
     if (GetSeconds() > NextKeepAliveTime)
     {
-        if (!(int)GetService<GameService>()->GetClients().empty() || 
+        if (!GetService<GameService>()->GetClients().empty() || 
             !std::filesystem::exists(KeepAliveFilePath))
         {
             const auto TimePoint = std::chrono::system_clock::now();
