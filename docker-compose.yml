@@ -40,7 +40,7 @@ services:
       retries: 3
 
   # dsos-master:                      # Uncomment if you need a standalone master server
-  #   image: jakeroxs/ds3os-master:latest
+  #   image: jakeroxs/dsos-master:latest
   #   container_name: dsos-master
   #   ports:
   #     - "50020:50020"

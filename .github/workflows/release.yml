@@ -147,7 +147,7 @@ jobs:
         image:
           - context: ./Source/MasterServer
             file: ./Source/MasterServer/Dockerfile
-            tag: ds3os-master:latest
+            tag: dsos-master:latest
           - context: .
             file: ./DarkSouls3.Dockerfile
             tag: ds3os:latest

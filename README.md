@@ -92,7 +92,7 @@ We don't provide an automation option to copy ds3os saves back to retail saves f
 Yes, there are 2 docker containers currently published for DSOS, these are automatically updated each time a new release is made:
 
 jakeroxs/ds3os - This is the main server and the one you almost certainly want.
-jakeroxs/ds3os-master - This is for the master server, unless you are making a fork of ds3os, you probably don't need this.
+jakeroxs/dsos-master - This is for the master server, unless you are making a fork of ds3os, you probably don't need this.
 
 If you want a quick one-liner to run the server, you can use this. Note that it mounts the Saved folder to the host filesystem at /opt/ds3os/Saved, making it easier to modify the configuration files. Access /opt/ds3os/Saved to view and modify the configuration files.
 
