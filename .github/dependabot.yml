@@ -14,11 +14,37 @@ updates:
           - "actions/*"
           - "docker://*"
           - "*"
-          
-  # Enable version updates for Docker
+
+  # Enable version updates for .NET/NuGet dependencies
+  - package-ecosystem: "nuget"
+    # Look for any .csproj or .sln files in the repo
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      nuget:
+        patterns:
+          - "*"
+
+  # Enable version updates for the MasterServer JavaScript dependencies
+  - package-ecosystem: "npm"
+    directory: "/Source/MasterServer"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm:
+        patterns:
+          - "*"
+
+  # Enable version updates for Docker (base images referenced in Dockerfile/docker-compose)
+  # Note: GitHub Actions `docker://...` images are handled by the `github-actions` ecosystem group above.
   - package-ecosystem: "docker"
     # Look for a `Dockerfile` in the `root` directory
     directory: "/"
     # Check for updates once a week
     schedule:
       interval: "weekly"
+    groups:
+      docker:
+        patterns:
+          - "*"
