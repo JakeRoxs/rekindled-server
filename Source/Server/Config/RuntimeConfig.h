@@ -133,6 +133,9 @@ struct RuntimeConfigSoulMemoryMatchingParameters
 class RuntimeConfig
 {
 public:
+    // Apply overrides from environment variables. If an environment variable is set, it will
+    // take precedence over the values loaded from the runtime config JSON.
+    void ApplyEnvironmentOverrides();
 
     // Type of the game this server should run.
     // DS3, DS2
@@ -157,6 +160,11 @@ public:
 
     // If Advertise is set this is the master server that it will be registered to.
     // Be careful changing this, typically only one server should exist.
+    //
+    // These values are loaded from the runtime config file, but can be overridden
+    // at runtime via environment variables (e.g. for containerized deployments):
+    //   MASTER_SERVER_IP
+    //   MASTER_SERVER_PORT
     std::string MasterServerIp = "dsos.jakesws.xyz";
 
     // Port the master server lists for connections at MasterServerIp;
