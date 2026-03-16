@@ -73,6 +73,10 @@ Tools/Utilities/ScyllaHide/
 Tools/Utilities/ServerAddressFinder/
 Tools/Deploy/
 
+# Python bytecode
+__pycache__/
+*.pyc
+
 # for nix build .
 result
 
@@ -89,3 +93,4 @@ copilot-instructions.md
 /.github/skills
 /todos
 /docs
+
