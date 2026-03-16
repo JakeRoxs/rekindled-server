@@ -105,8 +105,10 @@ jobs:
           if [ "$real" -eq 0 ]; then
             echo "::notice::Skipping CI: only docs/workflow files changed."
             echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::CI decision: skipped=true (no build-relevant changes detected)"
           else
             echo "skipped=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CI decision: skipped=false (build-relevant changes detected)"
           fi
   build:
     name: Build (matrix)
