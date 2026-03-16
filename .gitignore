@@ -92,4 +92,5 @@ copilot-instructions.md
 /.github/instructions
 /.github/skills
 /todos
-/docsTools/Utilities/fetch_code_scanning_alerts.py
+/docs
+
