@@ -13,6 +13,77 @@ env:
   BUILD_CONFIGURATION: Release
 
 jobs:
+  check:
+    name: Determine whether CI should run
+    runs-on: ubuntu-latest
+    outputs:
+      skipped: ${{ steps.determine.outputs.skipped }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Determine whether CI should run
+        id: determine
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Allow ** recursive globbing so we can detect changes to nested files.
+          shopt -s globstar
+
+          # Determine the range to diff (push vs PR)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA=${{ github.event.pull_request.base.sha }}
+            HEAD_SHA=${{ github.event.pull_request.head.sha }}
+          else
+            BASE_SHA=${{ github.event.before }}
+            HEAD_SHA=${{ github.sha }}
+          fi
+
+          # If there's no valid base commit (new branch / force push), run CI.
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "::notice::No base commit available; running CI."
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Comparing $BASE_SHA..$HEAD_SHA"
+
+          if ! CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA"); then
+            echo "::warning::git diff failed; running CI by default."
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          printf "Changed files:\n%s\n" "$CHANGED"
+
+          real=0
+          while IFS= read -r f; do
+            case "$f" in
+              # Only run CI when build-relevant files change.
+              # (This is intentionally narrow so non-build tweaks don't trigger the full matrix.)
+              .github/workflows/ci.yml)
+                real=1
+                break
+                ;;
+              CMakeLists.txt|Source/**|Protobuf/**|Resources/**)
+                real=1
+                break
+                ;;
+              # Everything else is non-build (docs, tooling, config, etc.)
+              *)
+                continue
+                ;;
+            esac
+          done < <(printf '%s\n' "$CHANGED")
+
+          if [ "$real" -eq 0 ]; then
+            echo "::notice::Skipping CI: only docs/workflow files changed."
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
   build:
     name: Build (matrix)
     runs-on: ${{ matrix.os }}
