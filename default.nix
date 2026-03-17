@@ -28,7 +28,7 @@ let
         };
 
         nativeBuildInputs = [ cmake pkg-config removeReferencesTo xz ];
-        buildInputs = [ libuuid ];
+        buildInputs = [ libuuid sqlite ];
 
         enableParallelBuilding = true;
 
@@ -53,8 +53,10 @@ let
             # Prefer using vendored third-party sources to avoid network fetches
             "-DDSOS_USE_VENDORED_CURL=ON"
             "-DDSOS_USE_VENDORED_CIVETWEB=ON"
-            "-DDSOS_USE_VENDORED_SQLITE=ON"
-            "-DDSOS_USE_VENDORED_OPENSSL=ON"
+            # Use system sqlite (from nixpkgs) instead of the vendored copy
+            "-DDSOS_USE_VENDORED_SQLITE=OFF"
+            # Use system OpenSSL (from nixpkgs) instead of the vendored copy
+            "-DDSOS_USE_VENDORED_OPENSSL=OFF"
         ];
 
         # Can't pass multiple flags through cmakeFlags *sigh*

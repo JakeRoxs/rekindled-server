@@ -103,6 +103,48 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE -D_CRT_SECURE_NO_WARNINGS -D_
 # Prefer the modern FindSQLite3 target if available.
 # ThirdParty/CMakeLists.txt is responsible for providing a usable `sqlite` target.
 if(NOT TARGET sqlite)
+    # Try to recover from missing sqlite target by aliasing known FindSQLite3 targets.
+    if(TARGET SQLite::SQLite3)
+        message(STATUS "SQLite::SQLite3 target found; aliasing to sqlite")
+        add_library(sqlite ALIAS SQLite::SQLite3)
+    elseif(TARGET SQLite3::SQLite3)
+        message(STATUS "SQLite3::SQLite3 target found; aliasing to sqlite")
+        add_library(sqlite ALIAS SQLite3::SQLite3)
+    else()
+        # Last-resort: attempt to find a system sqlite (may give variables but no target).
+        find_package(SQLite3 QUIET)
+        if(SQLite3_FOUND AND (DEFINED SQLite3_LIBRARIES OR DEFINED SQLite3_LIBRARY))
+            message(STATUS "Found system SQLite via find_package; creating sqlite INTERFACE target")
+            add_library(sqlite INTERFACE)
+            if(DEFINED SQLite3_LIBRARIES AND SQLite3_LIBRARIES)
+                target_link_libraries(sqlite INTERFACE ${SQLite3_LIBRARIES})
+            elseif(DEFINED SQLite3_LIBRARY AND SQLite3_LIBRARY)
+                target_link_libraries(sqlite INTERFACE ${SQLite3_LIBRARY})
+            endif()
+            if(DEFINED SQLite3_INCLUDE_DIRS AND SQLite3_INCLUDE_DIRS)
+                target_include_directories(sqlite INTERFACE ${SQLite3_INCLUDE_DIRS})
+            elseif(DEFINED SQLite3_INCLUDE_DIR AND SQLite3_INCLUDE_DIR)
+                target_include_directories(sqlite INTERFACE ${SQLite3_INCLUDE_DIR})
+            endif()
+        endif()
+    endif()
+endif()
+
+# If the target is still missing, attempt to directly bring in the vendored sqlite
+# directory (for CI/host scenarios where ThirdParty did not create it).
+if(NOT TARGET sqlite)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/sqlite/CMakeLists.txt")
+        message(STATUS "sqlite target still missing; adding ThirdParty/sqlite subdirectory directly")
+        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/sqlite")
+    endif()
+endif()
+
+if(NOT TARGET sqlite)
+    # Diagnostic output to help troubleshoot why sqlite is missing.
+    get_cmake_property(_all_targets TARGETS)
+    list(FILTER _all_targets INCLUDE REGEX "[sS]qlite")
+    message(STATUS "SQLite-related CMake targets: ${_all_targets}")
+    message(STATUS "CMake cache entries: SQLite3_FOUND=${SQLite3_FOUND} SQLite3_LIBRARIES='${SQLite3_LIBRARIES}' SQLite3_LIBRARY='${SQLite3_LIBRARY}' SQLite3_INCLUDE_DIRS='${SQLite3_INCLUDE_DIRS}' SQLite3_INCLUDE_DIR='${SQLite3_INCLUDE_DIR}'")
     message(FATAL_ERROR "Missing required SQLite target `sqlite`. Ensure ThirdParty is configured correctly or that a system SQLite is available.")
 endif()
 set(DSOS_SQLITE_TARGET sqlite)
