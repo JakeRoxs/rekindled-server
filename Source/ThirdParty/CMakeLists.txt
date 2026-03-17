@@ -126,6 +126,16 @@ else()
     endif()
 endif()
 
+# Provide a consistent, portable target name for consumers.
+# Some platforms/systems may provide only `SQLite::SQLite3` (from FindSQLite3), others
+# may provide a `sqlite` target (vendored build). Ensure both exist.
+if(NOT TARGET sqlite AND TARGET SQLite::SQLite3)
+    add_library(sqlite ALIAS SQLite::SQLite3)
+endif()
+if(NOT TARGET SQLite::SQLite3 AND TARGET sqlite)
+    add_library(SQLite::SQLite3 ALIAS sqlite)
+endif()
+
 # OpenSSL
 if(DSOS_USE_VENDORED_OPENSSL)
     dsos_append_dep_status("openssl: vendored (forced)")

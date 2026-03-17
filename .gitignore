@@ -82,7 +82,7 @@ result
 
 # Build and IDE files
 /.vscode
-/build
+/build*
 /out/build/x64-Debug
 
 # Copilot stuff
