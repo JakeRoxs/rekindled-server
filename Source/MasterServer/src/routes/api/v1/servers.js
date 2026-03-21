@@ -20,7 +20,9 @@ const {
 } = require("../../../utils/helpers");
 
 const serverTimeoutMs = config.serverTimeoutMs;
-const MASTER_SERVER_WRITE_SECRET = String(process.env.MASTER_SERVER_WRITE_SECRET ?? "").trim();
+const MASTER_SERVER_WRITE_SECRET = String(
+    process.env.MASTER_SERVER_WRITE_SECRET ?? "",
+).trim();
 
 if (!MASTER_SERVER_WRITE_SECRET) {
     console.error(
@@ -167,7 +169,9 @@ function validatePublicKey(value) {
     // Guard against ReDoS and extreme payloads by enforcing a stricter max length. (already checked above)
     // If PEM wrapper exists, use inner value; otherwise treat as raw base64.
     let keyContent = key;
-    const pemMatch = key.match(/^-+BEGIN\s+PUBLIC\s+KEY-+\s*([\s\S]+?)\s*-+END\s+PUBLIC\s+KEY-+$/i);
+    const pemMatch = key.match(
+        /^-+BEGIN\s+PUBLIC\s+KEY-+\s*([\s\S]+?)\s*-+END\s+PUBLIC\s+KEY-+$/i,
+    );
     if (pemMatch) {
         keyContent = pemMatch[1];
     }
@@ -244,7 +248,9 @@ function requireWriteAuth(req, res) {
         return sendError(res, 500, "Server write secret not configured");
     }
 
-    const providedSecret = String(req.get("x-master-server-write-secret") ?? "").trim();
+    const providedSecret = String(
+        req.get("x-master-server-write-secret") ?? "",
+    ).trim();
 
     const secretA = Buffer.from(providedSecret, "utf8");
     const secretB = Buffer.from(MASTER_SERVER_WRITE_SECRET, "utf8");
@@ -615,5 +621,3 @@ module.exports.getStatus = getStatus;
 module.exports.validatePublicKey = validatePublicKey;
 module.exports.normalizeServerId = normalizeServerId;
 module.exports.requireWriteAuth = requireWriteAuth;
-
-

@@ -342,10 +342,18 @@
                     <p class="metric" id="uptime"><%= uptime %></p>
                     <small>Process uptime since service start</small>
                 </article>
-                <article class="panel" aria-labelledby="oldestVersionLabel" aria-describedby="oldestVersionDesc">
+                <article
+                    class="panel"
+                    aria-labelledby="oldestVersionLabel"
+                    aria-describedby="oldestVersionDesc"
+                >
                     <h2 id="oldestVersionLabel">Oldest version</h2>
-                    <p class="metric" id="oldestVersionValue"><%= status.oldestSupportedVersion %></p>
-                    <small id="oldestVersionDesc">Minimum client version accepted</small>
+                    <p class="metric" id="oldestVersionValue">
+                        <%= status.oldestSupportedVersion %>
+                    </p>
+                    <small id="oldestVersionDesc"
+                        >Minimum client version accepted</small
+                    >
                 </article>
             </section>
 
@@ -544,7 +552,10 @@
                     }
 
                     const descCell = document.createElement("td");
-                    const description = safeString(s.Description, "No description");
+                    const description = safeString(
+                        s.Description,
+                        "No description",
+                    );
                     descCell.title = description;
                     descCell.textContent = description;
 

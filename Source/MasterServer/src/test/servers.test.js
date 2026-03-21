@@ -4,10 +4,19 @@ const test = require("node:test");
 process.env.MASTER_SERVER_WRITE_SECRET = "test-secret";
 
 delete require.cache[require.resolve("../routes/api/v1/servers")];
-const { validatePublicKey, normalizeServerId, requireWriteAuth } = require("../routes/api/v1/servers");
+const {
+    validatePublicKey,
+    normalizeServerId,
+    requireWriteAuth,
+} = require("../routes/api/v1/servers");
 
 function makeRes() {
-    const res = { statusCode: null, body: null, statusCalled: null, jsonCalled: null };
+    const res = {
+        statusCode: null,
+        body: null,
+        statusCalled: null,
+        jsonCalled: null,
+    };
     res.status = function (code) {
         res.statusCode = code;
         res.statusCalled = true;
