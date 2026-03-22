@@ -1,9 +1,11 @@
 @echo off
 
 SET ScriptPath=%~dp0
-SET RootPath=%ScriptPath%..
-SET RootPath=%RootPath:~0,-1%
-SET BuildPath=%ScriptPath%..\intermediate\vs2022
+REM Determine the repository root as the parent of Tools
+SET RootPath=%ScriptPath%..\
+for %%I in ("%RootPath%") do set "RootPath=%%~fI"
+if "%RootPath:~-1%"=="\" set "RootPath=%RootPath:~0,-1%"
+SET BuildPath=%RootPath%\intermediate\vs2022
 SET CMakeExePath=%ScriptPath%Build\cmake\windows\bin\cmake.exe
 
 if not exist "%CMakeExePath%" (
