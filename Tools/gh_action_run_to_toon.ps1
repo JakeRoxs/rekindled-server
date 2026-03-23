@@ -1,0 +1,408 @@
+<#
+.SYNOPSIS
+Fetch GitHub Actions run metadata and render in TOON-friendly text.
+
+.DESCRIPTION
+Uses `gh run view --json` to fetch run details and jobs/steps information, then prints a compact, token-efficient summary.
+
+.PARAMETER RunId
+The GitHub Actions run ID (required).
+
+.PARAMETER Repo
+Optional repository `owner/repo`. If omitted, the script uses GITHUB_REPOSITORY or infers from git remote.
+
+.PARAMETER Json
+When set, writes raw JSON (from gh) instead of TOON summary.
+
+.PARAMETER Out
+Optional output file path.
+#>
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory = $true, Position = 0)]
+    [Alias('run-id')]
+    [string]
+    $RunId,
+
+    [string]
+    $Repo,
+
+    [switch]
+    $Json,
+
+    [string]
+    $JobId,
+
+    [Alias('exclude-failed-log')]
+    [switch]
+    $ExcludeFailedLog,
+
+    [Alias('failed-log-lines')]
+    [int]
+    $FailedLogLines = 100,
+
+    [string]
+    $Out
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function Fail {
+    param([string]$Message, [int]$Code = 1)
+    Write-Error $Message
+    exit $Code
+}
+
+function Get-ObjectProperty {
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Object,
+        [Parameter(Mandatory = $true)]
+        [string]$PropertyName
+    )
+
+    if (-not $Object) { return $null }
+    $p = $Object.PSObject.Properties[$PropertyName]
+    if ($p) { return $p.Value }
+    return $null
+}
+
+function Resolve-Repo {
+    param(
+        [string]$Repo
+    )
+
+    if ($Repo) {
+        return $Repo
+    }
+
+    if ($env:GITHUB_REPOSITORY) {
+        return $env:GITHUB_REPOSITORY
+    }
+
+    try {
+        $origin = git remote get-url origin 2>$null
+    }
+    catch {
+        return $null
+    }
+
+    if ($origin -and $origin -match '[:/]([^/]+/[^/]+)(\.git)?$') {
+        return $Matches[1]
+    }
+
+    return $null
+}
+
+function Get-RunJson {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RunId,
+        [Parameter(Mandatory = $true)]
+        [string]$Repo
+    )
+
+    $fields = 'id,status,conclusion,event,createdAt,updatedAt,headBranch,headSha,workflow,name,url,jobs'
+
+    try {
+        $result = gh run view $RunId --repo $Repo --json $fields 2>&1 | Out-String
+        if ($LASTEXITCODE -eq 0 -and $result.Trim()) {
+            return $result
+        }
+        throw 'gh run view failed'
+    }
+    catch {
+        Write-Verbose "run view fallback scenario: $($_)"
+        Write-Warning "gh run view failed, trying fallback to gh api: $($_)"
+        try {
+            $result = gh api repos/$Repo/actions/runs/$RunId --jq '{ id, status, conclusion, event, created_at, updated_at, head_branch, head_sha, workflow_id, name, html_url, jobs }' 2>&1 | Out-String
+            if ($LASTEXITCODE -eq 0 -and $result.Trim()) {
+                return $result
+            }
+            Fail 'Failed to fetch run data from GitHub API (gh api).'
+        }
+        catch {
+            Fail "Unable to fetch run data from GitHub: $($_)"
+        }
+    }
+}
+
+function Get-JobsData {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RunId,
+        [Parameter(Mandatory = $true)]
+        [string]$Repo
+    )
+
+    try {
+        $jobsRaw = gh api repos/$Repo/actions/runs/$RunId/jobs 2>&1 | Out-String
+        if ($LASTEXITCODE -eq 0 -and $jobsRaw.Trim()) {
+            $jobsData = $jobsRaw | ConvertFrom-Json
+            Write-Verbose "Fetched jobs list, total: $($jobsData.total_count)"
+            return $jobsData
+        }
+        Write-Warning 'Could not fetch detailed jobs list; using run job summary only.'
+        return $null
+    }
+    catch {
+        Write-Warning "Error fetching jobs list: $($_)"
+        return $null
+    }
+}
+
+function ConvertTo-RunFields {
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Run
+    )
+
+    return [pscustomobject]@{
+        id          = Get-ObjectProperty -Object $Run -PropertyName 'id'
+        status      = Get-ObjectProperty -Object $Run -PropertyName 'status'
+        conclusion  = Get-ObjectProperty -Object $Run -PropertyName 'conclusion'
+        event       = Get-ObjectProperty -Object $Run -PropertyName 'event'
+        created_at  = (Get-ObjectProperty -Object $Run -PropertyName 'createdAt') ?? (Get-ObjectProperty -Object $Run -PropertyName 'created_at')
+        updated_at  = (Get-ObjectProperty -Object $Run -PropertyName 'updatedAt') ?? (Get-ObjectProperty -Object $Run -PropertyName 'updated_at')
+        workflow    = (Get-ObjectProperty -Object $Run -PropertyName 'workflow') ?? (Get-ObjectProperty -Object $Run -PropertyName 'workflow_id')
+        name        = Get-ObjectProperty -Object $Run -PropertyName 'name'
+        url         = (Get-ObjectProperty -Object $Run -PropertyName 'url') ?? (Get-ObjectProperty -Object $Run -PropertyName 'html_url')
+        head_branch = (Get-ObjectProperty -Object $Run -PropertyName 'headBranch') ?? (Get-ObjectProperty -Object $Run -PropertyName 'head_branch')
+        head_sha    = (Get-ObjectProperty -Object $Run -PropertyName 'headSha') ?? (Get-ObjectProperty -Object $Run -PropertyName 'head_sha')
+        jobs        = Get-ObjectProperty -Object $Run -PropertyName 'jobs'
+    }
+}
+
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    Fail "Missing GitHub CLI (gh). Install from https://cli.github.com/ and run 'gh auth login'."
+}
+
+$Repo = Resolve-Repo -Repo $Repo
+if (-not $Repo) {
+    Fail "Repository not specified. Use --repo owner/repo or run from a git repository with origin remote, or set GITHUB_REPOSITORY."
+}
+
+$runJson = Get-RunJson -RunId $RunId -Repo $Repo
+
+if ($Json) {
+    if (-not $Out) {
+        $Out = Join-Path -Path 'docs/logs' -ChildPath "gh_run_${RunId}.toon"
+    }
+    $outDir = [System.IO.Path]::GetDirectoryName($Out)
+    if (-not [System.IO.Directory]::Exists($outDir)) {
+        New-Item -Path $outDir -ItemType Directory -Force | Out-Null
+    }
+    if ($Out) {
+        $runJson | Out-File -FilePath $Out -Encoding utf8
+        Write-Verbose "Written JSON output to $Out"
+    }
+    Write-Output $runJson
+    exit 0
+}
+
+try {
+    $run = $runJson | ConvertFrom-Json
+}
+catch {
+    Fail "Failed parsing JSON output from gh. $($_)"
+}
+
+if (-not $run) {
+    Fail "No run data returned for run ID $RunId."
+}
+
+$normalizedRun = ConvertTo-RunFields -Run $run
+
+# Attempt to get richer job/step information from the jobs endpoint
+$jobsData = Get-JobsData -RunId $RunId -Repo $Repo
+
+if ($JobId -and -not $jobsData) {
+    Fail "Requested JobId $JobId but jobsData is unavailable."
+}
+
+
+$jobEntries = @()
+$failedJobs = @()
+$failedSteps = @()
+$jobCount = 0
+
+if ($jobsData -and $jobsData.jobs) {
+    $jobCount = $jobsData.total_count
+    foreach ($job in $jobsData.jobs) {
+        $jobEntries += "$($job.id)|$($job.name)|$($job.status)|$($job.conclusion)|$($job.started_at)|$($job.completed_at)"
+
+        if ($job.conclusion -and $job.conclusion -ne 'success') {
+            $failedJobs += "$($job.id)|$($job.name)|$($job.conclusion)|$($job.started_at)|$($job.completed_at)"
+        }
+
+        if ($job.steps) {
+            foreach ($step in $job.steps) {
+                if ($step.conclusion -and $step.conclusion -ne 'success') {
+                    $failedSteps += "$($job.name)|$($step.name)|$($step.conclusion)|$($step.number)|$($step.started_at)|$($step.completed_at)"
+                }
+            }
+        }
+    }
+}
+elseif ($normalizedRun.jobs -and $normalizedRun.jobs.jobs) {
+    $jobCount = $normalizedRun.jobs.jobs.Count
+    foreach ($job in $normalizedRun.jobs.jobs) {
+        $jobEntries += "$($job.id)|$($job.name)|$($job.status)|$($job.conclusion)||"
+
+        if ($job.conclusion -and $job.conclusion -ne 'success') {
+            $failedJobs += "$($job.id)|$($job.name)|$($job.conclusion)||"
+        }
+
+        if ($job.steps) {
+            foreach ($step in $job.steps) {
+                if ($step.conclusion -and $step.conclusion -ne 'success') {
+                    $failedSteps += "$($job.name)|$($step.name)|$($step.conclusion)|$($step.number)||"
+                }
+            }
+        }
+    }
+}
+
+$failedJobsCount = $failedJobs.Count
+$failedStepsCount = $failedSteps.Count
+
+# Auto collect failed job ids for focused diagnosis
+$failedJobIds = @()
+if ($jobsData -and $jobsData.jobs) {
+    $failedJobIds = $jobsData.jobs | Where-Object { $_.conclusion -and $_.conclusion -ne 'success' } | Select-Object -ExpandProperty id
+}
+elseif ($normalizedRun.jobs -and $normalizedRun.jobs.jobs) {
+    $failedJobIds = $normalizedRun.jobs.jobs | Where-Object { $_.conclusion -and $_.conclusion -ne 'success' } | Select-Object -ExpandProperty id
+}
+
+$failedLogSnippet = @()
+if (-not $ExcludeFailedLog) {
+    try {
+        $fullLogs = gh run view $RunId --repo $Repo --log-failed 2>&1 | Out-String
+        if ($fullLogs.Trim()) {
+            $lines = $fullLogs -split "`n"
+            $interesting = $lines | Where-Object { $_ -match '(?i)error|failed|cmake|build|step|failed to solve' }
+            if ($interesting.Count -gt $FailedLogLines) {
+                $interesting = $interesting[ - $FailedLogLines..-1]
+            }
+            $failedLogSnippet = $interesting
+        }
+    }
+    catch {
+        Write-Warning "Could not fetch failed run logs: $($_)"
+    }
+}
+
+function ToonLine { param($k, $v) "${k}:${v}" }
+
+$lines = [System.Collections.Generic.List[string]]::new()
+$lines.Add('TOON:github_actions_run')
+$lines.Add((ToonLine -k 'run_id' -v $normalizedRun.id))
+$lines.Add((ToonLine -k 'status' -v $normalizedRun.status))
+$lines.Add((ToonLine -k 'conclusion' -v $normalizedRun.conclusion))
+$lines.Add((ToonLine -k 'event' -v $normalizedRun.event))
+$lines.Add((ToonLine -k 'created_at' -v $normalizedRun.created_at))
+$lines.Add((ToonLine -k 'updated_at' -v $normalizedRun.updated_at))
+$lines.Add((ToonLine -k 'workflow' -v $normalizedRun.workflow))
+$lines.Add((ToonLine -k 'name' -v $normalizedRun.name))
+$lines.Add((ToonLine -k 'url' -v $normalizedRun.url))
+$lines.Add((ToonLine -k 'head_branch' -v $normalizedRun.head_branch))
+$lines.Add((ToonLine -k 'head_sha' -v $normalizedRun.head_sha))
+$lines.Add((ToonLine -k 'job_count' -v $jobCount))
+$lines.Add((ToonLine -k 'failed_job_count' -v $failedJobsCount))
+$lines.Add((ToonLine -k 'failed_step_count' -v $failedStepsCount))
+if ($failedJobIds.Count -gt 0) {
+    $lines.Add((ToonLine -k 'failed_job_ids' -v ($failedJobIds -join ',')))
+}
+
+if ($failedLogSnippet.Count -gt 0) {
+    $lines.Add("failed_log_snippet[$($failedLogSnippet.Count)]:")
+    foreach ($line in $failedLogSnippet) {
+        $lines.Add("  $line")
+    }
+}
+
+if ($failedJobsCount -gt 0) {
+    $lines.Add("failed_jobs[$failedJobsCount]{id,name,conclusion,started_at,completed_at}:")
+    foreach ($entry in $failedJobs) {
+        $parts = $entry -split '\|'
+        $lines.Add("  $($parts[0]),$($parts[1]),$($parts[2]),$($parts[3]),$($parts[4])")
+    }
+}
+
+if ($failedStepsCount -gt 0) {
+    $lines.Add("failed_steps[$failedStepsCount]{job,step,conclusion,step_number,started_at,completed_at}:")
+    foreach ($entry in $failedSteps) {
+        $parts = $entry -split '\|'
+        $lines.Add("  $($parts[0]),$($parts[1]),$($parts[2]),$($parts[3]),$($parts[4]),$($parts[5])")
+    }
+}
+
+$autoDrillJobIds = @()
+if (-not $JobId -and $failedJobIds.Count -gt 0) {
+    $autoDrillJobIds = $failedJobIds
+}
+elseif ($JobId) {
+    $autoDrillJobIds = @($JobId)
+}
+
+foreach ($drillId in $autoDrillJobIds) {
+    $selectedJob = $null
+    if ($jobsData -and $jobsData.jobs) {
+        $selectedJob = $jobsData.jobs | Where-Object { $_.id -eq [long]$drillId }
+    }
+    elseif ($normalizedRun.jobs -and $normalizedRun.jobs.jobs) {
+        $selectedJob = $normalizedRun.jobs.jobs | Where-Object { $_.id -eq [long]$drillId }
+    }
+
+    if (-not $selectedJob) {
+        Write-Warning "Job ID $drillId not found in run $RunId; skipping deep drill."
+        continue
+    }
+
+    $lines.Add("job_detail:${drillId}")
+    $lines.Add("job_id:$($selectedJob.id)")
+    $lines.Add("job_name:$($selectedJob.name)")
+    $lines.Add("job_status:$($selectedJob.status)")
+    $lines.Add("job_conclusion:$($selectedJob.conclusion)")
+    $lines.Add("job_started_at:$($selectedJob.started_at)")
+    $lines.Add("job_completed_at:$($selectedJob.completed_at)")
+
+    if ($selectedJob.steps) {
+        $lines.Add("job_steps[$($selectedJob.steps.Count)]{name,status,conclusion,number,started_at,completed_at}:")
+        foreach ($step in $selectedJob.steps) {
+            $lines.Add("  $($step.name),$($step.status),$($step.conclusion),$($step.number),$($step.started_at),$($step.completed_at)")
+        }
+    }
+}
+
+$lines.Add("jobs[$jobCount]{id,name,status,conclusion,started_at,completed_at}:")
+foreach ($entry in $jobEntries) {
+    $parts = $entry -split '\|'
+    $lines.Add("  $($parts[0]),$($parts[1]),$($parts[2]),$($parts[3]),$($parts[4]),$($parts[5])")
+}
+
+$outString = $lines -join "`n"
+
+if (-not $Out) {
+    $Out = Join-Path -Path 'docs/logs' -ChildPath "gh_run_${RunId}.toon"
+}
+$outDir = [System.IO.Path]::GetDirectoryName($Out)
+if (-not [System.IO.Directory]::Exists($outDir)) {
+    New-Item -Path $outDir -ItemType Directory -Force | Out-Null
+}
+
+if ($Out) {
+    try {
+        $outString | Out-File -FilePath $Out -Encoding utf8
+        Write-Verbose "Written output to $Out"
+    }
+    catch {
+        $err = $_.Exception.Message
+        Fail ("Failed to write output file ${Out}: " + $err)
+    }
+}
+
+Write-Output $outString
+exit 0
