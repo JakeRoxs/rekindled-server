@@ -83,6 +83,13 @@ jobs:
             echo "(dependency-fetch-status.txt not found)"
           )
 
+      - name: Clean stale CMake cache (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          rm -f intermediate/make/CMakeCache.txt
+          rm -rf intermediate/make/CMakeFiles
+
       - name: Generate Solution (Linux)
         if: matrix.platform == 'linux'
         shell: bash
@@ -154,13 +161,6 @@ jobs:
           sudo apt-get install -y cmake ninja-build libssl-dev zlib1g-dev libsqlite3-dev pkg-config
           # UUID is used by the project; different distros name it differently.
           sudo apt-get install -y uuid-dev || sudo apt-get install -y libuuid-dev
-
-      - name: Clean stale CMake cache (Linux)
-        if: matrix.platform == 'linux'
-        shell: bash
-        run: |
-          rm -f intermediate/make/CMakeCache.txt
-          rm -rf intermediate/make/CMakeFiles
 
       - name: Build Linux (Ninja)
         if: matrix.platform == 'linux'

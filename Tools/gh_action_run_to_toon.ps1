@@ -158,18 +158,36 @@ function ConvertTo-RunFields {
         [psobject]$Run
     )
 
+    $createdAt = Get-ObjectProperty -Object $Run -PropertyName 'createdAt'
+    if (-not $createdAt) { $createdAt = Get-ObjectProperty -Object $Run -PropertyName 'created_at' }
+
+    $updatedAt = Get-ObjectProperty -Object $Run -PropertyName 'updatedAt'
+    if (-not $updatedAt) { $updatedAt = Get-ObjectProperty -Object $Run -PropertyName 'updated_at' }
+
+    $workflow = Get-ObjectProperty -Object $Run -PropertyName 'workflow'
+    if (-not $workflow) { $workflow = Get-ObjectProperty -Object $Run -PropertyName 'workflow_id' }
+
+    $url = Get-ObjectProperty -Object $Run -PropertyName 'url'
+    if (-not $url) { $url = Get-ObjectProperty -Object $Run -PropertyName 'html_url' }
+
+    $headBranch = Get-ObjectProperty -Object $Run -PropertyName 'headBranch'
+    if (-not $headBranch) { $headBranch = Get-ObjectProperty -Object $Run -PropertyName 'head_branch' }
+
+    $headSha = Get-ObjectProperty -Object $Run -PropertyName 'headSha'
+    if (-not $headSha) { $headSha = Get-ObjectProperty -Object $Run -PropertyName 'head_sha' }
+
     return [pscustomobject]@{
         id          = Get-ObjectProperty -Object $Run -PropertyName 'id'
         status      = Get-ObjectProperty -Object $Run -PropertyName 'status'
         conclusion  = Get-ObjectProperty -Object $Run -PropertyName 'conclusion'
         event       = Get-ObjectProperty -Object $Run -PropertyName 'event'
-        created_at  = (Get-ObjectProperty -Object $Run -PropertyName 'createdAt') ?? (Get-ObjectProperty -Object $Run -PropertyName 'created_at')
-        updated_at  = (Get-ObjectProperty -Object $Run -PropertyName 'updatedAt') ?? (Get-ObjectProperty -Object $Run -PropertyName 'updated_at')
-        workflow    = (Get-ObjectProperty -Object $Run -PropertyName 'workflow') ?? (Get-ObjectProperty -Object $Run -PropertyName 'workflow_id')
+        created_at  = $createdAt
+        updated_at  = $updatedAt
+        workflow    = $workflow
         name        = Get-ObjectProperty -Object $Run -PropertyName 'name'
-        url         = (Get-ObjectProperty -Object $Run -PropertyName 'url') ?? (Get-ObjectProperty -Object $Run -PropertyName 'html_url')
-        head_branch = (Get-ObjectProperty -Object $Run -PropertyName 'headBranch') ?? (Get-ObjectProperty -Object $Run -PropertyName 'head_branch')
-        head_sha    = (Get-ObjectProperty -Object $Run -PropertyName 'headSha') ?? (Get-ObjectProperty -Object $Run -PropertyName 'head_sha')
+        url         = $url
+        head_branch = $headBranch
+        head_sha    = $headSha
         jobs        = Get-ObjectProperty -Object $Run -PropertyName 'jobs'
     }
 }
