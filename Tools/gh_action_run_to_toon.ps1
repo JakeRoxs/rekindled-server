@@ -30,7 +30,7 @@ Optional job ID to drill into for detailed job.steps output.
 Skip fallback log grep for failed steps.
 
 .PARAMETER FailedLogLines
-Number of lines to include from failed log snippet when not excluded.
+Number of failed log lines to include when not excluded; 0 (default) includes full extracted logs, >0 limits to last N matching failure keywords.
 
 Behavior:
 - `--json` writes raw JSON output to --Out (if provided), else to docs/logs/gh_run_<id>.toon.
@@ -64,14 +64,14 @@ param (
 
     [Alias('failed-log-lines')]
     [int]
-    $FailedLogLines = 100,
+    $FailedLogLines = 0,
 
     [string]
     $Out
 )
 
-if ($FailedLogLines -lt 1) {
-    Fail 'failed-log-lines must be 1 or greater.'
+if ($FailedLogLines -lt 0) {
+    Fail 'failed-log-lines must be 0 (unlimited) or greater.'
 }
 
 Set-StrictMode -Version Latest
@@ -161,11 +161,23 @@ function Resolve-Repo {
         Write-Verbose "gh repo view failed: $($_)"
     }
 
+    # Try local repo in current directory or parent folders.
     try {
-        $origin = git remote get-url origin 2>$null
+        $gitDir = $PWD
+        while ($gitDir) {
+            if (Test-Path (Join-Path $gitDir '.git')) {
+                $origin = git -C $gitDir remote get-url origin 2>$null
+                if ($origin) {
+                    break
+                }
+            }
+            $parent = Split-Path -Parent $gitDir
+            if (-not $parent -or $parent -eq $gitDir) { break }
+            $gitDir = $parent
+        }
     }
     catch {
-        return $null
+        $origin = $null
     }
 
     if ($origin -and $origin -match '[:/]([^/]+/[^/]+)(\.git)?$') {
@@ -175,7 +187,7 @@ function Resolve-Repo {
     return $null
 }
 
-function Is-RepoIdentifier {
+function Test-RepoIdentifier {
     param([string]$value)
     return -not [string]::IsNullOrWhiteSpace($value) -and ($value -match '^[^/]+/[^/]+$')
 }
@@ -191,13 +203,13 @@ function Resolve-LatestRun {
         Fail 'Cannot resolve latest run: repository is not defined.'
     }
 
-    $args = @('--repo', $Repo, '--limit', '1', '--json', 'databaseId')
+    $ghArgs = @('--repo', $Repo, '--limit', '1', '--json', 'databaseId')
     if ($Workflow) {
-        $args += @('--workflow', $Workflow)
+        $ghArgs += @('--workflow', $Workflow)
     }
 
-    Write-Verbose "Resolving latest run via gh run list ($([string]::Join(' ', $args)))"
-    $raw = gh run list @args 2>&1 | Out-String
+    Write-Verbose "Resolving latest run via gh run list ($([string]::Join(' ', $ghArgs)))"
+    $raw = gh run list @ghArgs 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) {
         Fail "gh run list failed (exit $LASTEXITCODE): $raw"
     }
@@ -417,7 +429,7 @@ if ($RunId -eq 'latest-release') {
 }
 
 if ($Latest -or $RunId -eq 'latest') {
-    if (-not $Workflow -and $rawRepoInput -and -not (Is-RepoIdentifier $rawRepoInput)) {
+    if (-not $Workflow -and $rawRepoInput -and -not (Test-RepoIdentifier $rawRepoInput)) {
         # Interpret second positional value as workflow name when using syntax: latest <workflow>
         $Workflow = $rawRepoInput
     }
@@ -555,12 +567,25 @@ if (-not $ExcludeFailedLog) {
         }
     }
 
-    # Fallback to text grep log extraction when no structured failed steps were found or if we still want full failure lines
-    if ($failedLogSnippet.Count -eq 0) {
+    # If requested via default mode, include the full failed run logs in the snippet.
+    if ($FailedLogLines -eq 0) {
+        try {
+            $fullLogs = gh run view $RunId --repo $Repo --log-failed 2>&1 | Out-String
+            if ($fullLogs.Trim()) {
+                $failedLogSnippet = $fullLogs -split "`n"
+            }
+        }
+        catch {
+            Write-Warning "Could not fetch failed run logs: $($_)"
+        }
+    }
+    # Otherwise, if we did not have structured details, keep the most relevant lines.
+    elseif ($failedLogSnippet.Count -eq 0) {
         try {
             $fullLogs = gh run view $RunId --repo $Repo --log-failed 2>&1 | Out-String
             if ($fullLogs.Trim()) {
                 $lines = $fullLogs -split "`n"
+
                 $interesting = $lines | Where-Object { $_ -match '(?i)error|failed|cmake|build|step|failed to solve' }
                 if ($interesting.Count -gt $FailedLogLines) {
                     $interesting = $interesting[ - $FailedLogLines..-1]
