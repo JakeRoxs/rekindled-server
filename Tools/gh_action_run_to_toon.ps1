@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Fetch GitHub Actions run metadata and render in TOON-friendly text.
+Fetch GitHub Actions run metadata and render in TOON-format text.
 
 .DESCRIPTION
 Uses `gh run view --json` to fetch run details and jobs/steps information, then prints a compact, token-efficient summary.
@@ -16,6 +16,25 @@ When set, writes raw JSON (from gh) instead of TOON summary.
 
 .PARAMETER Out
 Optional output file path.
+
+.PARAMETER Repo
+Optional repository `owner/repo`; default from GITHUB_REPOSITORY or git origin remote if omitted.
+
+.PARAMETER Workflow
+Optional workflow name for `latest` run resolution.
+
+.PARAMETER JobId
+Optional job ID to drill into for detailed job.steps output.
+
+.PARAMETER ExcludeFailedLog
+Skip fallback log grep for failed steps.
+
+.PARAMETER FailedLogLines
+Number of lines to include from failed log snippet when not excluded.
+
+Behavior:
+- `--json` writes raw JSON output to --Out (if provided), else to docs/logs/gh_run_<id>.toon.
+- Without `--json`, writes TOON format summary + jobs details.
 #>
 [CmdletBinding()]
 param (
@@ -51,6 +70,10 @@ param (
     $Out
 )
 
+if ($FailedLogLines -lt 1) {
+    Fail 'failed-log-lines must be 1 or greater.'
+}
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -72,6 +95,46 @@ function Get-ObjectProperty {
     $p = $Object.PSObject.Properties[$PropertyName]
     if ($p) { return $p.Value }
     return $null
+}
+
+function Get-RunProperty {
+    param(
+        [Parameter(Mandatory = $true)]
+        [psobject]$Object,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Keys
+    )
+
+    foreach ($key in $Keys) {
+        $value = Get-ObjectProperty -Object $Object -PropertyName $key
+        if ($null -ne $value) {
+            return $value
+        }
+    }
+
+    return $null
+}
+
+function Invoke-WithRetry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$ScriptBlock,
+        [int]$MaxAttempts = 3,
+        [int]$DelaySeconds = 2
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            return & $ScriptBlock
+        }
+        catch {
+            $err = $_.Exception.Message
+            if ($attempt -eq $MaxAttempts) {
+                throw "Retry failed after $MaxAttempts attempts: $err"
+            }
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
 }
 
 function Resolve-Repo {
@@ -166,35 +229,67 @@ function Get-RunJson {
     )
 
     # gh run view does not expose 'id', use databaseId (alias to run_id) instead.
-    $fields = 'databaseId,status,conclusion,event,attempt,createdAt,updatedAt,headBranch,headSha,workflowName,workflowDatabaseId,displayTitle,url,jobs'
+    $fields = @(
+        'databaseId',
+        'status',
+        'conclusion',
+        'event',
+        'attempt',
+        'createdAt',
+        'updatedAt',
+        'headBranch',
+        'headSha',
+        'workflowName',
+        'workflowDatabaseId',
+        'displayTitle',
+        'url',
+        'jobs'
+    )
 
+    # Ensure field list is as supported by current gh version, fallback duplicates handled.
     Write-Verbose "Fetching run metadata for run ID '$RunId' in repo '$Repo'"
 
     # Prefer gh run view first (avoids API 404 on odd API path details).
     $result = $null
 
     if ($Repo) {
-        Write-Verbose "gh run view --repo $Repo --json $fields $RunId"
-        $result = gh run view --repo $Repo --json $fields $RunId 2>&1 | Out-String
+        Write-Verbose "gh run view --repo $Repo --json $($fields -join ',') $RunId"
+        try {
+            $result = Invoke-WithRetry -ScriptBlock {
+                gh run view --repo $Repo --json $($fields -join ',') $RunId 2>&1 | Out-String
+            }
+            if ($LASTEXITCODE -eq 0 -and $result.Trim()) {
+                return $result
+            }
+            Write-Verbose "gh run view (--repo) failed (exit $LASTEXITCODE): $result"
+        }
+        catch {
+            Write-Verbose "gh run view (--repo) retry failed: $($_)"
+        }
+    }
+
+    Write-Verbose "gh run view --json $($fields -join ',') $RunId"
+    try {
+        $result = Invoke-WithRetry -ScriptBlock {
+            gh run view --json $($fields -join ',') $RunId 2>&1 | Out-String
+        }
         if ($LASTEXITCODE -eq 0 -and $result.Trim()) {
             return $result
         }
-        Write-Verbose "gh run view (--repo) failed (exit $LASTEXITCODE): $result"
+        Write-Verbose "gh run view (no repo) failed (exit $LASTEXITCODE): $result"
     }
-
-    Write-Verbose "gh run view --json $fields $RunId"
-    $result = gh run view --json $fields $RunId 2>&1 | Out-String
-    if ($LASTEXITCODE -eq 0 -and $result.Trim()) {
-        return $result
+    catch {
+        Write-Verbose "gh run view (no repo) retry failed: $($_)"
     }
-    Write-Verbose "gh run view (no repo) failed (exit $LASTEXITCODE): $result"
 
     # Most cases should now be handled, but if we have a repo claim we can still try API fallback.
     if ($Repo) {
         Write-Warning "gh run view failed; trying fallback to gh api for repo $Repo"
         try {
             Write-Verbose "gh api repos/$Repo/actions/runs/$RunId --jq '{ id, status, conclusion, event, attempt, created_at, updated_at, head_branch, head_sha, workflow_id, workflow_name, workflow_database_id, display_title, name, html_url, jobs }'"
-            $result = gh api "repos/$Repo/actions/runs/$RunId" --jq '{ id, status, conclusion, event, attempt, created_at, updated_at, head_branch, head_sha, workflow_id, workflow_name, workflow_database_id, display_title, name, html_url, jobs }' 2>&1 | Out-String
+            $result = Invoke-WithRetry -ScriptBlock {
+                gh api "repos/$Repo/actions/runs/$RunId" --jq '{ id, status, conclusion, event, attempt, created_at, updated_at, head_branch, head_sha, workflow_id, workflow_name, workflow_database_id, display_title, name, html_url, jobs }' 2>&1 | Out-String
+            }
             if ($LASTEXITCODE -eq 0 -and $result.Trim()) {
                 return $result
             }
@@ -262,42 +357,33 @@ function ConvertTo-RunFields {
         [psobject]$Run
     )
 
-    $createdAt = Get-ObjectProperty -Object $Run -PropertyName 'createdAt'
-    if (-not $createdAt) { $createdAt = Get-ObjectProperty -Object $Run -PropertyName 'created_at' }
+    $createdAt = Get-RunProperty -Object $Run -Keys @('createdAt', 'created_at')
+    $updatedAt = Get-RunProperty -Object $Run -Keys @('updatedAt', 'updated_at')
+    $attempt = Get-RunProperty -Object $Run -Keys @('attempt')
 
-    $updatedAt = Get-ObjectProperty -Object $Run -PropertyName 'updatedAt'
-    if (-not $updatedAt) { $updatedAt = Get-ObjectProperty -Object $Run -PropertyName 'updated_at' }
+    $workflow = Get-RunProperty -Object $Run -Keys @('workflow', 'workflow_id')
+    $workflowName = Get-RunProperty -Object $Run -Keys @('workflowName', 'workflow_name')
+    $workflowDatabaseId = Get-RunProperty -Object $Run -Keys @('workflowDatabaseId', 'workflow_database_id')
+    $displayTitle = Get-RunProperty -Object $Run -Keys @('displayTitle', 'display_title')
+    $url = Get-RunProperty -Object $Run -Keys @('url', 'html_url')
+    $headBranch = Get-RunProperty -Object $Run -Keys @('headBranch', 'head_branch')
+    $headSha = Get-RunProperty -Object $Run -Keys @('headSha', 'head_sha')
 
-    $attempt = Get-ObjectProperty -Object $Run -PropertyName 'attempt'
+    $runId = Get-RunProperty -Object $Run -Keys @('id', 'databaseId')
+    $status = Get-ObjectProperty -Object $Run -PropertyName 'status'
+    $conclusion = Get-ObjectProperty -Object $Run -PropertyName 'conclusion'
 
-    $workflow = Get-ObjectProperty -Object $Run -PropertyName 'workflow'
-    if (-not $workflow) { $workflow = Get-ObjectProperty -Object $Run -PropertyName 'workflow_id' }
-
-    $workflowName = Get-ObjectProperty -Object $Run -PropertyName 'workflowName'
-    if (-not $workflowName) { $workflowName = Get-ObjectProperty -Object $Run -PropertyName 'workflow_name' }
-
-    $workflowDatabaseId = Get-ObjectProperty -Object $Run -PropertyName 'workflowDatabaseId'
-    if (-not $workflowDatabaseId) { $workflowDatabaseId = Get-ObjectProperty -Object $Run -PropertyName 'workflow_database_id' }
-
-    $displayTitle = Get-ObjectProperty -Object $Run -PropertyName 'displayTitle'
-    if (-not $displayTitle) { $displayTitle = Get-ObjectProperty -Object $Run -PropertyName 'display_title' }
-
-    $url = Get-ObjectProperty -Object $Run -PropertyName 'url'
-    if (-not $url) { $url = Get-ObjectProperty -Object $Run -PropertyName 'html_url' }
-
-    $headBranch = Get-ObjectProperty -Object $Run -PropertyName 'headBranch'
-    if (-not $headBranch) { $headBranch = Get-ObjectProperty -Object $Run -PropertyName 'head_branch' }
-
-    $headSha = Get-ObjectProperty -Object $Run -PropertyName 'headSha'
-    if (-not $headSha) { $headSha = Get-ObjectProperty -Object $Run -PropertyName 'head_sha' }
-
-    $runId = Get-ObjectProperty -Object $Run -PropertyName 'id'
-    if (-not $runId) { $runId = Get-ObjectProperty -Object $Run -PropertyName 'databaseId' }
+    if (-not $status) {
+        Write-Warning "Run status is missing in the run payload for $runId"
+    }
+    if (-not $conclusion) {
+        Write-Warning "Run conclusion is missing in the run payload for $runId"
+    }
 
     return [pscustomobject]@{
         id                   = $runId
-        status               = Get-ObjectProperty -Object $Run -PropertyName 'status'
-        conclusion           = Get-ObjectProperty -Object $Run -PropertyName 'conclusion'
+        status               = $status
+        conclusion           = $conclusion
         event                = Get-ObjectProperty -Object $Run -PropertyName 'event'
         attempt              = $attempt
         created_at           = $createdAt
@@ -377,6 +463,12 @@ $normalizedRun = ConvertTo-RunFields -Run $run
 
 # Attempt to get richer job/step information from the jobs endpoint
 $jobsData = Get-JobsData -RunId $RunId -Repo $Repo
+
+# Fallback: if run payload lacks jobs but jobs endpoint has them, use that
+if (-not $normalizedRun.jobs -and $jobsData -and $jobsData.jobs) {
+    $normalizedRun.jobs = $jobsData
+    Write-Verbose "run jobs data missing; using jobs endpoint response for job list"
+}
 
 if ($JobId -and -not $jobsData) {
     Fail "Requested JobId $JobId but jobsData is unavailable."
