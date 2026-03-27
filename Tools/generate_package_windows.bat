@@ -27,8 +27,10 @@ set ERR=0
 
 if exist "%OUTPUT_ROOT%\steam_appid.txt" (
     xcopy /s "%OUTPUT_ROOT%\steam_appid.txt" DS3OS\Server\
+) else if exist "Resources\steam_appid.txt" (
+    xcopy /s "Resources\steam_appid.txt" DS3OS\Server\
 ) else (
-    echo WARNING: steam_appid.txt not found in %OUTPUT_ROOT%
+    echo WARNING: steam_appid.txt not found in %OUTPUT_ROOT% or Resources
     set ERR=1
 )
 if exist "%OUTPUT_ROOT%\steam_api64.dll" (
@@ -41,8 +43,10 @@ if exist "%OUTPUT_ROOT%\steam_api64.dll" (
 )
 if exist "%OUTPUT_ROOT%\WebUI" (
     xcopy /s "%OUTPUT_ROOT%\WebUI\" DS3OS\Server\WebUI\
+) else if exist "Source\WebUI" (
+    xcopy /s "Source\WebUI\" DS3OS\Server\WebUI\
 ) else (
-    echo WARNING: WebUI folder not found in %OUTPUT_ROOT%
+    echo WARNING: WebUI folder not found in %OUTPUT_ROOT% or Source\WebUI
     set ERR=1
 )
 if exist "%OUTPUT_ROOT%\Server.exe" (

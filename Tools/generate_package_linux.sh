@@ -23,15 +23,21 @@ ERR=0
 
 if [ -f "$OUTPUT_ROOT/steam_appid.txt" ]; then
   cp "$OUTPUT_ROOT/steam_appid.txt" DS3OS/Server/
+elif [ -f "Resources/steam_appid.txt" ]; then
+  cp "Resources/steam_appid.txt" DS3OS/Server/
 else
-  echo "WARNING: steam_appid.txt not found in $OUTPUT_ROOT"
+  echo "WARNING: steam_appid.txt not found in $OUTPUT_ROOT or Resources"
   ERR=1
 fi
 
 if [ -f "$OUTPUT_ROOT/libsteam_api.so" ]; then
   cp "$OUTPUT_ROOT/libsteam_api.so" DS3OS/Server/
+elif [ -f "Source/ThirdParty/steam/redistributable_bin/linux64/libsteam_api.so" ]; then
+  cp "Source/ThirdParty/steam/redistributable_bin/linux64/libsteam_api.so" DS3OS/Server/
+elif [ -f "Source/ThirdParty/steam/redistributable_bin/linux32/libsteam_api.so" ]; then
+  cp "Source/ThirdParty/steam/redistributable_bin/linux32/libsteam_api.so" DS3OS/Server/
 else
-  echo "WARNING: libsteam_api.so not found in $OUTPUT_ROOT"
+  echo "WARNING: libsteam_api.so not found in $OUTPUT_ROOT or Source/ThirdParty"
   ERR=1
 fi
 
@@ -44,8 +50,10 @@ fi
 
 if [ -d "$OUTPUT_ROOT/WebUI" ]; then
   cp -R "$OUTPUT_ROOT/WebUI/" DS3OS/Server/WebUI/
+elif [ -d "Source/WebUI" ]; then
+  cp -R "Source/WebUI/" DS3OS/Server/WebUI/
 else
-  echo "WARNING: WebUI folder not found in $OUTPUT_ROOT"
+  echo "WARNING: WebUI folder not found in $OUTPUT_ROOT or Source/WebUI"
   ERR=1
 fi
 
