@@ -68,6 +68,8 @@ if exist "%OUTPUT_ROOT%\Server.pdb" (
 
 if exist "%OUTPUT_ROOT%\Injector.pdb" (
     xcopy /s "%OUTPUT_ROOT%\Injector.pdb" DS3OS\Loader\
+) else if exist "intermediate\vs2022\Source\Injector\Injector.pdb" (
+    xcopy /s "intermediate\vs2022\Source\Injector\Injector.pdb" DS3OS\Loader\
 ) else if exist "Source\Injector\bin\x64_release\Injector.pdb" (
     xcopy /s "Source\Injector\bin\x64_release\Injector.pdb" DS3OS\Loader\
 ) else if exist "build\Source\Injector\Injector.pdb" (
@@ -78,6 +80,8 @@ if exist "%OUTPUT_ROOT%\Injector.pdb" (
 )
 if exist "%OUTPUT_ROOT%\Injector.dll" (
     xcopy /s "%OUTPUT_ROOT%\Injector.dll" DS3OS\Loader\
+) else if exist "intermediate\vs2022\Source\Injector\Injector.dll" (
+    xcopy /s "intermediate\vs2022\Source\Injector\Injector.dll" DS3OS\Loader\
 ) else if exist "Source\Injector\bin\x64_release\Injector.dll" (
     xcopy /s "Source\Injector\bin\x64_release\Injector.dll" DS3OS\Loader\
 ) else if exist "build\Source\Injector\Injector.dll" (
