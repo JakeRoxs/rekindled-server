@@ -52,6 +52,7 @@ namespace Loader.Services
       ProgramSettings.Default.server_config_json = serverList.ToJson();
       ProgramSettings.Default.hide_passworded = hidePassworded;
       ProgramSettings.Default.minimum_players = minimumPlayers;
+      ProgramSettings.Default.use_seperate_saves = UseSeparateSaves;
       ProgramSettings.Default.Save();
     }
   }

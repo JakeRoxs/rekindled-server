@@ -16,6 +16,11 @@ RUN sed -i 's/\r$//' ./generate_make_release.sh && \
 WORKDIR /build
 RUN cd intermediate/make && (if [ -f build.ninja ]; then ninja -j$(nproc || echo 4); else make -j$(nproc || echo 4); fi)
 
+# Ensure canonical output exists before transitioning to runtime stage
+RUN if [ ! -d /build/bin/x64_release ]; then \
+      echo "Error: canonical build output directory /build/bin/x64_release not found"; exit 1; \
+    fi
+
 FROM steamcmd/steamcmd:latest@sha256:e5d7e8acdef9d99dbeff206df05b3762d3108a5ce58315be488ae199abca7b09 AS steam
 
 # Make steamcmd download steam client libraries so we can copy them later.
@@ -57,11 +62,7 @@ RUN echo "$STEAM_APP_ID" >> /opt/ds2os/steam_appid.txt
 
 # Copy only the built runtime outputs from the build stage into the runtime image.
 # Avoid copying the full /build tree to keep image size small.
-RUN if [ -d /build/bin/x64_release ]; then \
-      cp -a /build/bin/x64_release/. /opt/ds2os/; \
-    else \
-      echo "Error: canonical build output directory /build/bin/x64_release not found"; exit 1; \
-    fi
+COPY --from=build /build/bin/x64_release/. /opt/ds2os/
 
 # Optional debug output during build (comment out in production):
 # RUN ls -al /opt/ds2os && find /opt/ds2os -maxdepth 4 -type f -print

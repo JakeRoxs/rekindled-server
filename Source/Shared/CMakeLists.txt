@@ -171,10 +171,10 @@ message(STATUS "PLATFORM_LIBRARIES=${PLATFORM_LIBRARIES}")
 if(WIN32)
     list(REMOVE_DUPLICATES PLATFORM_LIBRARIES)
 
-    # Prevent implicit unqualified system libraries from being appended to the link line,
-    # which can fail in environments without LIB path configured.
-    set(CMAKE_CXX_STANDARD_LIBRARIES "")
-    set(CMAKE_C_STANDARD_LIBRARIES "")
+    # Avoid globally clobbering CMake's standard library defaults, which can break
+    # linking by removing runtime/system libraries for all targets in this scope.
+    # Keep the normal CMake standard runtime link handling, and ensure platform
+    # libs are resolved via explicit link directories/target_link_libraries.
 
     if(_system_link_paths)
         target_link_directories(${PROJECT_NAME} PRIVATE ${_system_link_paths})

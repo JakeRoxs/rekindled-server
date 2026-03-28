@@ -26,7 +26,8 @@ add_library(${PROJECT_NAME} STATIC ${SOURCES})
 # __builtin_ia32_aeskeygenassist128 target feature errors on GCC/Clang.
 if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64|AMD64|i386|i686)")
     if (CMAKE_C_COMPILER_ID STREQUAL "GNU" OR (CMAKE_C_COMPILER_ID STREQUAL "Clang" AND NOT MSVC))
-        target_compile_options(${PROJECT_NAME} PRIVATE -maes -mssse3 -msse4.1)
+        # Only apply AES/SSE extensions to aes_ni.c to avoid forcing these ISA extensions
+        # on all object files in the library.
         set_source_files_properties(aes_ni.c PROPERTIES COMPILE_OPTIONS "-maes;-mssse3;-msse4.1")
     elseif(CMAKE_C_COMPILER_ID STREQUAL "Clang" AND MSVC)
         # clang-cl uses MSVC option style; do not add GCC-style -m flags here.

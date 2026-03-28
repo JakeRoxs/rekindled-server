@@ -71,11 +71,12 @@ bool GetMachineIPv4(NetIPAddress& Output, bool GetPublicAddress)
             Addr->S_un.S_un_b.s_b4
         );
 #else
+        uint32_t addr = ntohl(Addr->s_addr);
         Output = NetIPAddress(
-            Addr->s_addr & 0xFF,
-            (Addr->s_addr >> 8) & 0xFF,
-            (Addr->s_addr >> 16) & 0xFF,
-            (Addr->s_addr >> 24) & 0xFF
+            (addr >> 24) & 0xFF,
+            (addr >> 16) & 0xFF,
+            (addr >> 8) & 0xFF,
+            addr & 0xFF
         );
 #endif
 
