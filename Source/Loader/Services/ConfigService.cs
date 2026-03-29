@@ -43,15 +43,21 @@ namespace Loader.Services
       if (exeLocation.EndsWith("DarkSoulsIII.exe", StringComparison.OrdinalIgnoreCase))
       {
         ProgramSettings.Default.ds3_exe_location = exeLocation;
+        Ds3ExeLocation = exeLocation;
       }
       else if (exeLocation.EndsWith("DarkSoulsII.exe", StringComparison.OrdinalIgnoreCase))
       {
         ProgramSettings.Default.ds2_exe_location = exeLocation;
+        Ds2ExeLocation = exeLocation;
       }
 
-      ProgramSettings.Default.server_config_json = serverList.ToJson();
+      var json = serverList.ToJson();
+      ProgramSettings.Default.server_config_json = json;
+      ServerConfigJson = json;
       ProgramSettings.Default.hide_passworded = hidePassworded;
+      HidePassworded = hidePassworded;
       ProgramSettings.Default.minimum_players = minimumPlayers;
+      MinimumPlayers = minimumPlayers;
       ProgramSettings.Default.use_seperate_saves = UseSeparateSaves;
       ProgramSettings.Default.Save();
     }

@@ -75,6 +75,12 @@ endif()
 
 project(ds3os C CXX)
 
+option(DSOS_ALLOW_NON_NINJA "Allow non-Ninja generator to configure/build" OFF)
+
+if(NOT CMAKE_GENERATOR STREQUAL "Ninja" AND NOT DSOS_ALLOW_NON_NINJA)
+    message(FATAL_ERROR "dsos requires Ninja generator by default for consistent builds. Re-run CMake with -G Ninja, or set -DDSOS_ALLOW_NON_NINJA=ON to override.")
+endif()
+
 if(NOT CMAKE_C_COMPILER OR NOT CMAKE_CXX_COMPILER)
     message(FATAL_ERROR "No C/C++ compiler found. Install a compatible toolchain (e.g., Ninja with gcc/clang, or Visual Studio 2022/2026) and retry. Ensure CMake is invoked with -G Ninja or -G 'Visual Studio 18 2026' when appropriate.")
 endif()
@@ -95,10 +101,21 @@ file(WRITE "${DSOS_COMPILE_COMMANDS_SYNC_SCRIPT}"
 "endif()\n"
 )
 
-add_custom_target(dsos_sync_compile_commands ALL
-    COMMAND ${CMAKE_COMMAND} -P "${DSOS_COMPILE_COMMANDS_SYNC_SCRIPT}"
-    COMMENT "Sync compile_commands.json into workspace root for VS Code"
-)
+option(DSOS_SYNC_COMPILE_COMMANDS "Enable explicit target to sync compile_commands.json into the source tree" OFF)
+
+if(DSOS_SYNC_COMPILE_COMMANDS)
+    add_custom_target(dsos_sync_compile_commands
+        COMMAND ${CMAKE_COMMAND} -P "${DSOS_COMPILE_COMMANDS_SYNC_SCRIPT}"
+        COMMENT "Sync compile_commands.json into workspace root for VS Code"
+    )
+else()
+    add_custom_target(dsos_sync_compile_commands
+        COMMAND ${CMAKE_COMMAND} -P "${DSOS_COMPILE_COMMANDS_SYNC_SCRIPT}"
+        COMMENT "Sync compile_commands.json into workspace root for VS Code (run explicitly with -DDSOS_SYNC_COMPILE_COMMANDS=ON or 'cmake --build . --target dsos_sync_compile_commands')"
+        VERBATIM
+    )
+    set_target_properties(dsos_sync_compile_commands PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
 
 add_subdirectory(Source)
 

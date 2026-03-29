@@ -77,4 +77,5 @@ jobs:
         run: |
           mkdir -p intermediate/make
           cd intermediate/make
+          cmake -S ${{ github.workspace }} -B . -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build . -- -j$(nproc)

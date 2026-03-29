@@ -61,7 +61,12 @@ public:
     explicit Client(const ClientConfig& config);
     ~Client();
 
-    bool Init(bool disablePersistentData = false, size_t instanceId = 0);
+    // Initialize the instance using the current ClientConfig values.
+    bool Init();
+
+    // Allows callers to override the disable-persistent/instance-id values before Init.
+    void OverrideConfig(bool disablePersistentData, size_t instanceId);
+
     bool Term();
     void RunUntilQuit();
 

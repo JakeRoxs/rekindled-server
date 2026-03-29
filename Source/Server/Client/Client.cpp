@@ -63,11 +63,9 @@ Client::~Client()
     CtrlSignalHandle.reset();
 }
 
-bool Client::Init(bool inDisablePersistentData, size_t inInstanceId)
+bool Client::Init()
 {
-    Config.DisablePersistentData = inDisablePersistentData;
-    Config.InstanceId = inInstanceId;
-
+    // Use the configuration supplied at construction by default.
     ClientStreamId = StringFormat("%016llx", SteamUser()->GetSteamID().ConvertToUint64());
 
     if (Config.DisablePersistentData)
@@ -81,8 +79,6 @@ bool Client::Init(bool inDisablePersistentData, size_t inInstanceId)
         // this on any arbitrary account without replacing the templates.
         Ensure(ClientStreamId == "011000014a0ce047");
     }
-
-    //LogS(GetName().c_str(), "Initializing client '%s' ...", ClientStreamId.c_str());
 
     if (!Config.DisablePersistentData)
     {
@@ -107,6 +103,38 @@ bool Client::Init(bool inDisablePersistentData, size_t inInstanceId)
     if (!PrimaryKeyPair.LoadPublicKeyFromString(Config.ServerPublicKey))
     {
         ErrorS(GetName().c_str(), "Failed to load rsa keypair.");
+        return false;
+    }
+
+    if constexpr (BuildConfig::AUTH_ENABLED)
+    {
+        //LogS(GetName().c_str(), "Requesting auth session ticket ...");
+        AppTicket.resize(2048);
+        uint32 TicketLength = 0;
+        AppTicketHandle = SteamUser()->GetAuthSessionTicket(AppTicket.data(), (int)AppTicket.size(), &TicketLength);
+
+        if (AppTicketHandle != k_HAuthTicketInvalid)
+        {
+            AppTicket.resize(TicketLength);
+            //LogS(GetName().c_str(), "Received auth session ticket of length %i", TicketLength);
+        }
+        else
+        {
+            ErrorS(GetName().c_str(), "Failed to retrieve auth session ticket.");
+            return false;
+        }
+    }
+
+    ChangeState(ClientState::LoginServer_Connect);
+
+    return true;
+}
+
+void Client::OverrideConfig(bool inDisablePersistentData, size_t inInstanceId)
+{
+    Config.DisablePersistentData = inDisablePersistentData;
+    Config.InstanceId = inInstanceId;
+}
         return false;
     }
 

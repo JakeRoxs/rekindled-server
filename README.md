@@ -137,14 +137,19 @@ https://github.com/jakeroxs/ds3os/blob/main/Source/Server/Config/RuntimeConfig.h
 
 # How do I build it?
 
-The project is written in C++17 and uses CMake for cross-platform builds. On Windows,
-using the Visual Studio generator is recommended when Visual Studio/Clang-cl is available.
+The project is written in C++17 and uses CMake for cross-platform builds.
 
-Prefer a local generator you have installed, such as:
+**Required:** CMake should be configured with Ninja by default.
+The repo now enforces this in `CMakeLists.txt` (fatal configure error when non-Ninja is used unless `-DDSOS_ALLOW_NON_NINJA=ON`).
 
-- `Visual Studio 18 2026` (MSVC / Clang-CL)
-- `Visual Studio 17 2022` (if available)
-- `Ninja` (fallback for cross-platform CLI usage)
+Use:
+
+- `Ninja` (preferred, cross-platform)
+
+Optional fallback (only with explicit override):
+
+- `Visual Studio 18 2026` (MSVC / Clang-CL) with `-DDSOS_ALLOW_NON_NINJA=ON`
+- `Visual Studio 17 2022` (if available) with `-DDSOS_ALLOW_NON_NINJA=ON`
 
 ## Prerequisites
 
