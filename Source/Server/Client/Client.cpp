@@ -135,32 +135,6 @@ void Client::OverrideConfig(bool inDisablePersistentData, size_t inInstanceId)
     Config.DisablePersistentData = inDisablePersistentData;
     Config.InstanceId = inInstanceId;
 }
-        return false;
-    }
-
-    if constexpr (BuildConfig::AUTH_ENABLED)
-    {
-        //LogS(GetName().c_str(), "Requesting auth session ticket ...");
-        AppTicket.resize(2048);
-        uint32 TicketLength = 0;
-        AppTicketHandle = SteamUser()->GetAuthSessionTicket(AppTicket.data(), (int)AppTicket.size(), &TicketLength);
-
-        if (AppTicketHandle != k_HAuthTicketInvalid)
-        {
-            AppTicket.resize(TicketLength);
-            //LogS(GetName().c_str(), "Received auth session ticket of length %i", TicketLength);
-        }
-        else
-        {
-            ErrorS(GetName().c_str(), "Failed to retrieve auth session ticket.");
-            return false;
-        }
-    }
-
-    ChangeState(ClientState::LoginServer_Connect);
-
-    return true;
-}
 
 bool Client::Term()
 {
