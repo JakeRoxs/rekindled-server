@@ -96,7 +96,7 @@ jobs:
       - name: Build .NET Loader project for C# analysis
         run: |
           export PATH="$HOME/.dotnet/tools:$PATH"
-          dotnet build Source/Loader/Loader.csproj -c Release
+          dotnet build Source/Loader/Loader.csproj -c Release /p:EnableWindowsTargeting=true
 
       - name: SonarScanner for .NET end
         env:
