@@ -21,6 +21,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import traceback
 import unittest
@@ -32,6 +33,9 @@ from typing import Any, Callable, Dict, List, Optional
 DEFAULT_SCAN_WORKFLOWS = "codeql.yml"
 UNKNOWN_GROUP = "<unknown>"
 THIRD_PARTY_PREFIX = "Source/ThirdParty/"
+DEFAULT_MCP_CONFIG_FILE = os.path.expanduser(
+    os.path.join("~", "AppData", "Roaming", "Code", "User", "mcp.json")
+)
 
 
 def _parse_git_remote_url(url: str) -> Optional[tuple[str, str]]:
@@ -49,7 +53,7 @@ def _parse_git_remote_url(url: str) -> Optional[tuple[str, str]]:
             return owner, repo
         except (ValueError, IndexError):
             return None
-    if url.startswith("https://") or url.startswith("http://"):
+    if url.startswith("https://"):
         try:
             parts = url.split("/")
             # e.g. https://github.com/owner/repo.git
@@ -74,6 +78,247 @@ def get_git_origin_repo() -> Optional[tuple[str, str]]:
         return _parse_git_remote_url(output)
     except (subprocess.CalledProcessError, OSError):
         return None
+
+
+def load_mcp_sonarqube_config(config_path: str) -> Dict[str, str]:
+    """Load SonarQube values from an mcp.json ["servers"]["sonarqube"] entry."""
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            obj = json.load(f)
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        print(f"WARNING: unable to parse MCP config {config_path}: {e}", file=sys.stderr)
+        return {}
+
+    sonar = (obj.get("servers") or {}).get("sonarqube") or {}
+    if not isinstance(sonar, dict):
+        return {}
+
+    return {
+        "sonarqube_url": str(sonar.get("env", {}).get("SONARQUBE_URL", "") or sonar.get("url", "") or "").strip(),
+        "sonarqube_token": str(sonar.get("env", {}).get("SONARQUBE_TOKEN", "") or "").strip(),
+        "sonarqube_project_key": str(sonar.get("env", {}).get("SONARQUBE_PROJECT_KEY", "") or "").strip(),
+    }
+
+
+def load_sonar_properties_project_key(properties_path: str) -> str:
+    """Read sonar.projectKey from sonar-project.properties."""
+    try:
+        with open(properties_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("#") or not line:
+                    continue
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    if key.strip() == "sonar.projectKey":
+                        return value.strip()
+    except FileNotFoundError:
+        return ""
+    except Exception as e:
+        print(f"WARNING: unable to parse sonar properties file {properties_path}: {e}", file=sys.stderr)
+    return ""
+
+
+def resolve_sonarqube_settings(args: Any, parser: argparse.ArgumentParser) -> bool:
+    """Resolve SonarQube settings from legacy sources and validate required fields."""
+    if args.source != "sonarqube":
+        return False
+
+    if not (args.sonarqube_url and args.sonarqube_token and args.sonarqube_project_key):
+        mcp_cfg = load_mcp_sonarqube_config(args.mcp_config)
+        args.sonarqube_url = args.sonarqube_url or mcp_cfg.get("sonarqube_url", "")
+        args.sonarqube_token = args.sonarqube_token or mcp_cfg.get("sonarqube_token", "")
+        args.sonarqube_project_key = args.sonarqube_project_key or mcp_cfg.get("sonarqube_project_key", "")
+
+    if not args.sonarqube_project_key:
+        args.sonarqube_project_key = load_sonar_properties_project_key(args.sonarqube_properties)
+
+    if not args.sonarqube_url:
+        parser.error("--sonarqube-url is required for --source sonar")
+    if not args.sonarqube_token:
+        parser.error("--sonarqube-token is required for --source sonar")
+    if not args.sonarqube_project_key:
+        parser.error("--sonarqube-project-key is required for --source sonar")
+
+    return True
+
+
+def get_alert_data(args: Any, owner_str: str, repo_str: str, cache_path: str) -> List[Dict[str, Any]]:
+    """Load or fetch scan data based on source selection."""
+    data = None
+    if args.source == "github" and not args.force:
+        data = _load_cache(
+            cache_path,
+            args.cache_ttl,
+            owner_str,
+            repo_str,
+            args.scan_workflows,
+            args.cache_based_on_codeql,
+        )
+
+    if data is None:
+        if args.source == "github":
+            data = run_gh_api(owner_str, repo_str, args.state, args.per_page)
+            _save_cache(cache_path, data)
+        else:
+            sonar_issues = run_sonarqube_api(
+                args.sonarqube_url,
+                args.sonarqube_project_key,
+                args.sonarqube_token,
+                state=args.state.upper(),
+                page_size=args.per_page,
+            )
+            data = [
+                _sonarqube_issue_to_alert(issue, args.sonarqube_url, args.sonarqube_project_key)
+                for issue in sonar_issues
+            ]
+
+    if not isinstance(data, list):
+        print("ERROR: expected a list of alerts from the API", file=sys.stderr)
+        sys.exit(1)
+
+    return data
+
+
+def run_todo_generation(args: Any, data: List[Dict[str, Any]], parser: argparse.ArgumentParser) -> int:
+    groups = group_alerts(data, group_by=args.group_by)
+    print(f"Found {len(data)} alerts in {len(groups)} groups (grouped by {args.group_by}).")
+    for k, v in sorted(groups.items(), key=lambda i: (-len(i[1]), i[0])):
+        print(f" - {len(v):4d} alerts in group '{k}'")
+
+    if args.preview_todos and args.write_todos:
+        parser.error("Cannot use --preview-todos and --write-todos together. Choose one.")
+
+    if args.preview_todos:
+        return 0
+
+    todo_root = os.path.abspath(args.todo_dir)
+    if args.clean and os.path.abspath(todo_root) in (os.path.abspath("todos"), os.path.abspath(".")):
+        parser.error("--clean on top-level dirs is not allowed. Use --todo-dir todos/code-scanning (default).")
+
+    os.makedirs(todo_root, exist_ok=True)
+    if args.clean:
+        _clean_todo_dir(todo_root)
+
+    written = _write_todos(groups, todo_root)
+    print(f"Wrote {written} todo file(s) to {todo_root}")
+    return written
+
+
+def run_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Fetch GitHub Code Scanning alerts and write todos for each alert group."
+    )
+    parser.add_argument(
+        "--owner",
+        default=None,
+        help="GitHub repository owner (default: inferred from git origin)",
+    )
+    parser.add_argument(
+        "--repo",
+        default=None,
+        help="GitHub repository name (default: inferred from git origin)",
+    )
+    parser.add_argument(
+        "--state",
+        default="open",
+        choices=["open", "closed", "dismissed"],
+        help="Alert state to fetch",
+    )
+    parser.add_argument(
+        "--per-page",
+        type=int,
+        default=100,
+        help="Number of alerts to request per page (API limit is 100)",
+    )
+    parser.add_argument(
+        "--cache-file",
+        default="docs/logs/code_scanning_alerts_cache.json",
+        help="Local cache file path for storing the last API response",
+    )
+    parser.add_argument(
+        "--cache-ttl",
+        type=int,
+        default=3600,
+        help="Time in seconds before cached response is considered stale",
+    )
+    parser.add_argument(
+        "--no-cache-based-on-codeql",
+        dest="cache_based_on_codeql",
+        action="store_false",
+        help="Do not treat the cache as stale based on the latest successful CodeQL workflow run (enabled by default)",
+    )
+    parser.add_argument(
+        "--source",
+        choices=["github", "sonarqube"],
+        default="github",
+        help="Source to fetch security alerts from",
+    )
+    parser.add_argument(
+        "--mcp-config",
+        default=os.environ.get("MCP_CONFIG", DEFAULT_MCP_CONFIG_FILE),
+        help="Path to MCP settings file (used to auto-load SonarQube settings)",
+    )
+    parser.add_argument(
+        "--sonarqube-properties",
+        default="sonar-project.properties",
+        help="Path to sonar-project.properties (used to auto-load sonar.projectKey)",
+    )
+    parser.add_argument(
+        "--sonarqube-url",
+        default=os.environ.get("SONARQUBE_URL", ""),
+        help="SonarQube server URL (required for --source sonar)",
+    )
+    parser.add_argument(
+        "--sonarqube-token",
+        default=os.environ.get("SONARQUBE_TOKEN", ""),
+        help="SonarQube authentication token (required for --source sonar)",
+    )
+    parser.add_argument(
+        "--sonarqube-project-key",
+        default=os.environ.get("SONARQUBE_PROJECT_KEY", ""),
+        help="SonarQube project key (required for --source sonar)",
+    )
+    parser.add_argument(
+        "--scan-workflows",
+        default=DEFAULT_SCAN_WORKFLOWS,
+        help="Comma-separated list of workflow filenames (e.g. CodeQL, SonarQube) used to determine cache freshness",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-fetching alerts from the API even if cache is fresh",
+    )
+    parser.add_argument(
+        "--preview-todos",
+        action="store_true",
+        help="Print a summary of how many todos would be generated and group counts (no files written)",
+    )
+    parser.add_argument(
+        "--write-todos",
+        action="store_true",
+        help="Write todo markdown files under the provided directory (default: todos/). This is implied when no output mode is specified.",
+    )
+    parser.add_argument(
+        "--todo-dir",
+        default="todos/code-scanning",
+        help="Root directory to write code scanning todo files when --write-todos is enabled (default: todos/code-scanning)",
+    )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Remove previously-generated code scanning todo files under --todo-dir before writing new ones",
+    )
+    parser.add_argument(
+        "--group-by",
+        default="thirdparty_rule",
+        choices=["rule", "path", "severity", "thirdparty", "thirdparty_rule"],
+        help="How to group alerts when generating todo items",
+    )
+
+    return parser
 
 
 def run_gh_api(
@@ -123,6 +368,90 @@ def run_gh_api(
         print(f"ERROR: failed to parse JSON from gh api output: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
         raise SystemExit(1)
+
+def run_sonarqube_api(
+    sonar_url: str,
+    project_key: str,
+    token: str,
+    state: str = "OPEN",
+    page_size: int = 500,
+) -> List[Dict[str, Any]]:
+    """Fetch issues from SonarQube and return as a list of issue dicts."""
+
+    if not sonar_url.rstrip("/"):
+        raise ValueError("SonarQube URL is required")
+    if not project_key:
+        raise ValueError("SonarQube project key is required")
+
+    sonar_url = sonar_url.rstrip("/")
+    api_endpoint = f"{sonar_url}/api/issues/search"
+
+    issues: List[Dict[str, Any]] = []
+    page = 1
+
+    while True:
+        query = (
+            f"componentKeys={project_key}&statuses={state}&ps={page_size}&p={page}"
+        )
+        cmd = [
+            "curl",
+            "-s",
+            "-u",
+            f"{token}:",
+            f"{api_endpoint}?{query}",
+        ]
+
+        try:
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, text=True)
+            payload = json.loads(output)
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR: failed to run SonarQube API: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            raise SystemExit(1)
+        except json.JSONDecodeError as e:
+            print(f"ERROR: failed to parse JSON from SonarQube API output: {e}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            raise SystemExit(1)
+
+        page_issues = payload.get("issues", [])
+        if not isinstance(page_issues, list):
+            raise ValueError("Unexpected SonarQube API response format")
+
+        issues.extend(page_issues)
+
+        paging = payload.get("paging", {})
+        total = int(paging.get("total", 0))
+        if len(issues) >= total or len(page_issues) == 0:
+            break
+
+        page += 1
+
+    return issues
+
+
+def _sonarqube_issue_to_alert(issue: Dict[str, Any], sonar_url: str, project_key: str) -> Dict[str, Any]:
+    component = issue.get("component", "")
+    path = component.split(":", 1)[1] if ":" in component else component
+
+    return {
+        "number": issue.get("key", ""),
+        "state": issue.get("status", "OPEN"),
+        "rule": {
+            "name": issue.get("rule", ""),
+            "severity": issue.get("severity", ""),
+            "description": issue.get("message", ""),
+            "help": issue.get("message", ""),
+            "helpUri": None,
+        },
+        "most_recent_instance": {
+            "location": {
+                "path": path,
+                "start_line": issue.get("line"),
+            },
+            "message": {"text": issue.get("message", "")},
+        },
+        "html_url": f"{sonar_url}/project/issues?id={project_key}&resolved=false&severities={issue.get('severity','')}&rules={issue.get('rule','')}",
+    }
 
 
 def _parse_iso_timestamp(value: Any, workflow_file: str) -> Optional[float]:
@@ -186,11 +515,14 @@ def _get_workflow_latest_run_time(
 
 
 def get_last_scan_workflow_run_time(
-    owner: str,
-    repo: str,
+    owner: Optional[str],
+    repo: Optional[str],
     workflow_files: List[str] | str = DEFAULT_SCAN_WORKFLOWS,
     check_output_fn: Callable[..., str] | None = None,
 ) -> Optional[float]:
+    if not owner or not repo:
+        return None
+
     if isinstance(workflow_files, str):
         workflow_files = [wf.strip() for wf in workflow_files.split(",") if wf.strip()]
 
@@ -259,17 +591,20 @@ def _group_by_severity(alert: Dict[str, Any]) -> str:
     return (alert.get("rule", {}) or {}).get("severity") or UNKNOWN_GROUP
 
 
-def _group_by_thirdparty(alert: Dict[str, Any]) -> str:
+def _group_by_thirdparty(alert: Dict[str, Any], repo_name: Optional[str] = None) -> str:
     path = (alert.get("most_recent_instance", {}) or {}).get("location", {}).get("path", "")
     if path.startswith(THIRD_PARTY_PREFIX):
         remainder = path[len(THIRD_PARTY_PREFIX) :]
-        return remainder.split("/", 1)[0] or "<thirdparty>"
-    return "<repo>"
+        return remainder.split("/", 1)[0] or "thirdparty"
+
+    if repo_name:
+        return repo_name
+    return "project"
 
 
-def _group_by_thirdparty_rule(alert: Dict[str, Any]) -> str:
-    (alert.get("most_recent_instance", {}) or {}).get("location", {}).get("path", "")
-    lib = _group_by_thirdparty(alert)
+def _group_by_thirdparty_rule(alert: Dict[str, Any], repo_name: Optional[str] = None) -> str:
+    # include a human-friendly root tag for non-thirdparty path groupings
+    lib = _group_by_thirdparty(alert, repo_name)
     rule_name = (alert.get("rule", {}) or {}).get("name") or UNKNOWN_GROUP
     return f"{lib}::{rule_name}"
 
@@ -290,13 +625,21 @@ def group_alerts(alerts: List[Dict[str, Any]], group_by: str = "rule") -> Dict[s
     """
     out: Dict[str, List[Dict[str, Any]]] = {}
 
-    key_selector = {
-        "path": _group_by_path,
-        "severity": _group_by_severity,
-        "thirdparty": _group_by_thirdparty,
-        "thirdparty_rule": _group_by_thirdparty_rule,
-        "rule": _group_by_rule,
-    }.get(group_by, _group_by_rule)
+    repo_name = None
+    origin = get_git_origin_repo()
+    if origin:
+        repo_name = origin[1]
+
+    if group_by == "path":
+        key_selector = _group_by_path
+    elif group_by == "severity":
+        key_selector = _group_by_severity
+    elif group_by == "thirdparty":
+        key_selector = lambda alert: _group_by_thirdparty(alert, repo_name)
+    elif group_by == "thirdparty_rule":
+        key_selector = lambda alert: _group_by_thirdparty_rule(alert, repo_name)
+    else:
+        key_selector = _group_by_rule
 
     for a in alerts:
         out.setdefault(key_selector(a), []).append(a)
@@ -454,6 +797,19 @@ def next_issue_id(todo_root: str) -> str:
     return f"{max_id + 1:03d}"
 
 
+def _existing_todo_path(todo_root: str, group_key: str) -> Optional[str]:
+    safe_name = safe_filename(group_key)
+    pattern = os.path.join(todo_root, "**", f"*-*-{safe_name}.md")
+    found = sorted(glob.glob(pattern, recursive=True))
+    return found[0] if found else None
+
+
+def _extract_issue_id_from_filename(path: str) -> Optional[str]:
+    base = os.path.basename(path)
+    m = re.match(r"^(\d{3})-", base)
+    return m.group(1) if m else None
+
+
 def _resolve_owner_repo(owner: Optional[str], repo: Optional[str]) -> tuple[Optional[str], Optional[str]]:
     if owner and repo:
         return owner, repo
@@ -468,8 +824,8 @@ def _resolve_owner_repo(owner: Optional[str], repo: Optional[str]) -> tuple[Opti
 def _load_cache(
     cache_path: str,
     cache_ttl: int,
-    owner: str,
-    repo: str,
+    owner: Optional[str],
+    repo: Optional[str],
     scan_workflows: str,
     cache_based_on_codeql: bool,
 ) -> Optional[Any]:
@@ -513,152 +869,60 @@ def _clean_todo_dir(todo_root: str) -> None:
 
 
 def _write_todos(groups: Dict[str, List[Dict[str, Any]]], todo_root: str) -> int:
-    issue_id = next_issue_id(todo_root)
+    issue_id_counter = int(next_issue_id(todo_root))
+    created_or_updated = 0
+
     for group_key, alerts in groups.items():
         if not alerts:
             continue
+
         filename = safe_filename(group_key)
-        first_alert = alerts[0]
-        severity = (first_alert.get("rule", {}) or {}).get("severity")
+        existing_path = _existing_todo_path(todo_root, group_key)
+
+        if existing_path:
+            existing_id = _extract_issue_id_from_filename(existing_path) or f"{issue_id_counter:03d}"
+            new_body = render_todo_body(existing_id, group_key, alerts)
+
+            with open(existing_path, "r", encoding="utf-8") as f:
+                existing_body = f.read()
+
+            if existing_body != new_body:
+                with open(existing_path, "w", encoding="utf-8") as f:
+                    f.write(new_body)
+                created_or_updated += 1
+            continue
+
+        # create a new todo file for this group
         todo_path = os.path.join(
             todo_root,
-            f"{issue_id}-pending-{severity_to_priority(severity)}-{filename}.md",
+            f"{issue_id_counter:03d}-pending-{severity_to_priority((alerts[0].get('rule', {}) or {}).get('severity'))}-{filename}.md",
         )
         with open(todo_path, "w", encoding="utf-8") as f:
-            f.write(render_todo_body(issue_id, group_key, alerts))
-        issue_id = f"{int(issue_id) + 1:03d}"
-    return len(groups)
+            f.write(render_todo_body(f"{issue_id_counter:03d}", group_key, alerts))
+
+        issue_id_counter += 1
+        created_or_updated += 1
+
+    return created_or_updated
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Fetch GitHub Code Scanning alerts and write todos for each alert group."
-    )
-    parser.add_argument(
-        "--owner",
-        default=None,
-        help="GitHub repository owner (default: inferred from git origin)",
-    )
-    parser.add_argument(
-        "--repo",
-        default=None,
-        help="GitHub repository name (default: inferred from git origin)",
-    )
-    parser.add_argument(
-        "--state",
-        default="open",
-        choices=["open", "closed", "dismissed"],
-        help="Alert state to fetch",
-    )
-    parser.add_argument(
-        "--per-page",
-        type=int,
-        default=100,
-        help="Number of alerts to request per page (API limit is 100)",
-    )
-    parser.add_argument(
-        "--cache-file",
-        default="docs/logs/code_scanning_alerts_cache.json",
-        help="Local cache file path for storing the last API response",
-    )
-    parser.add_argument(
-        "--cache-ttl",
-        type=int,
-        default=3600,
-        help="Time in seconds before cached response is considered stale",
-    )
-    parser.add_argument(
-        "--no-cache-based-on-codeql",
-        dest="cache_based_on_codeql",
-        action="store_false",
-        help="Do not treat the cache as stale based on the latest successful CodeQL workflow run (enabled by default)",
-    )
-    parser.add_argument(
-        "--scan-workflows",
-        default=DEFAULT_SCAN_WORKFLOWS,
-        help="Comma-separated list of workflow filenames (e.g. CodeQL, SonarQube) used to determine cache freshness",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Force re-fetching alerts from the API even if cache is fresh",
-    )
-    parser.add_argument(
-        "--preview-todos",
-        action="store_true",
-        help="Print a summary of how many todos would be generated and group counts (no files written)",
-    )
-    parser.add_argument(
-        "--write-todos",
-        action="store_true",
-        help="Write todo markdown files under the provided directory (default: todos/). This is implied when no output mode is specified.",
-    )
-    parser.add_argument(
-        "--todo-dir",
-        default="todos/code-scanning",
-        help="Root directory to write code scanning todo files when --write-todos is enabled (default: todos/code-scanning)",
-    )
-    parser.add_argument(
-        "--clean",
-        action="store_true",
-        help="Remove previously-generated code scanning todo files under --todo-dir before writing new ones",
-    )
-    parser.add_argument(
-        "--group-by",
-        default="thirdparty_rule",
-        choices=["rule", "path", "severity", "thirdparty", "thirdparty_rule"],
-        help="How to group alerts when generating todo items",
-    )
-
+    parser = run_arg_parser()
     args = parser.parse_args(argv)
 
+    # Resolve SonarQube settings if needed.
+    resolve_sonarqube_settings(args, parser)
+
     owner, repo = _resolve_owner_repo(args.owner, args.repo)
-    if not owner or not repo:
+    if args.source == "github" and (not owner or not repo):
         parser.error("Unable to determine GitHub owner/repo. Pass --owner/--repo or run from a git clone with origin set.")
 
+    owner_str = str(owner or "")
+    repo_str = str(repo or "")
     cache_path = os.path.abspath(args.cache_file)
 
-    data = None
-    if not args.force:
-        data = _load_cache(
-            cache_path,
-            args.cache_ttl,
-            owner,
-            repo,
-            args.scan_workflows,
-            args.cache_based_on_codeql,
-        )
-
-    if data is None:
-        data = run_gh_api(owner, repo, args.state, args.per_page)
-        _save_cache(cache_path, data)
-
-    if not isinstance(data, list):
-        print("ERROR: expected a list of alerts from the API", file=sys.stderr)
-        return 1
-
-    groups = group_alerts(data, group_by=args.group_by)
-    print(f"Found {len(data)} alerts in {len(groups)} groups (grouped by {args.group_by}).")
-    for k, v in sorted(groups.items(), key=lambda i: (-len(i[1]), i[0])):
-        print(f" - {len(v):4d} alerts in group '{k}'")
-
-    if args.preview_todos and args.write_todos:
-        parser.error("Cannot use --preview-todos and --write-todos together. Choose one.")
-
-    if args.preview_todos:
-        return 0
-
-    todo_root = os.path.abspath(args.todo_dir)
-    if args.clean and os.path.abspath(todo_root) in (os.path.abspath("todos"), os.path.abspath(".")):
-        parser.error("--clean on top-level dirs is not allowed. Use --todo-dir todos/code-scanning (default).")
-
-    os.makedirs(todo_root, exist_ok=True)
-    if args.clean:
-        _clean_todo_dir(todo_root)
-
-    written = _write_todos(groups, todo_root)
-    print(f"Wrote {written} todo file(s) to {todo_root}")
-    return 0
+    data = get_alert_data(args, owner_str, repo_str, cache_path)
+    return run_todo_generation(args, data, parser)
 
 
 class GetLastScanWorkflowRunTimeTests(unittest.TestCase):
@@ -771,6 +1035,49 @@ class AlertGroupingAndTodoRenderingTests(unittest.TestCase):
         self.assertIn("**Recommendation:** Do something", body)
         self.assertIn("**More info:** https://example.com/docs", body)
         self.assertIn("`Source/Main.cs:10`", body)
+
+    def test_group_by_thirdparty_project_defaults_for_repo_sources(self):
+        alert = {
+            "rule": {"name": "DummyRule"},
+            "most_recent_instance": {"location": {"path": "Source/dsos/File.cs", "start_line": 1}},
+        }
+        self.assertEqual(_group_by_thirdparty(alert, "dsos"), "dsos")
+
+    def test_group_by_thirdparty_rule_includes_repo_name_when_on_repo(self):
+        alert = {
+            "rule": {"name": "DummyRule"},
+            "most_recent_instance": {"location": {"path": "Source/dsos/File.cs", "start_line": 1}},
+        }
+        self.assertEqual(_group_by_thirdparty_rule(alert, "dsos"), "dsos::DummyRule")
+
+    def test_write_todos_reuses_existing_file_and_updates_if_changed(self):
+        alerts = [
+            {
+                "number": 1,
+                "html_url": "https://example.com/alert/1",
+                "rule": {"name": "MyRule", "description": "Desc", "severity": "warning", "help": "Fix it", "helpUri": "https://docs"},
+                "most_recent_instance": {"location": {"path": "Source/Example.cs", "start_line": 5}, "message": {"text": "Issue"}},
+            }
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            written_first = _write_todos({"MyRule": alerts}, tmpdir)
+            self.assertEqual(written_first, 1)
+
+            written_second = _write_todos({"MyRule": alerts}, tmpdir)
+            self.assertEqual(written_second, 0)
+
+            modified_alerts = [
+                {
+                    "number": 1,
+                    "html_url": "https://example.com/alert/1",
+                    "rule": {"name": "MyRule", "description": "Desc", "severity": "warning", "help": "Fix it now", "helpUri": "https://docs"},
+                    "most_recent_instance": {"location": {"path": "Source/Example.cs", "start_line": 5}, "message": {"text": "Issue"}},
+                }
+            ]
+
+            written_third = _write_todos({"MyRule": modified_alerts}, tmpdir)
+            self.assertEqual(written_third, 1)
 
 
 if __name__ == "__main__":

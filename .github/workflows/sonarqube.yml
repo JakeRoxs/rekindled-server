@@ -45,6 +45,19 @@ jobs:
         run: |
           cd build
           cmake --build .
+      - name: Debug - check compile_commands and file structure
+        run: |
+          echo "=== compile_commands.json exists? ==="
+          ls -la build/compile_commands.json
+
+          echo "=== First 3 entries in compile_commands.json ==="
+          head -40 build/compile_commands.json
+
+          echo "=== C/C++ files found in repo ==="
+          find . -not -path './build/*' \( -name "*.cpp" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" \) | head -20
+
+          echo "=== sonar-project.properties ==="
+          cat sonar-project.properties
 
       - uses: SonarSource/sonarqube-scan-action@v6
         env:
