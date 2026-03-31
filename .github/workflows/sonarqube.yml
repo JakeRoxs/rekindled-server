@@ -62,7 +62,7 @@ jobs:
             /d:sonar.host.url="$SONAR_HOST_URL" \
             /d:sonar.token="$SONAR_TOKEN" \
             /d:sonar.sources=. \
-            /d:sonar.inclusions="Source/**/*.cpp,Source/**/*.c,Source/**/*.h,Source/**/*.hpp,Source/**/*.cs,Loader/**/*.cs,Source/**/CMakeLists.txt" \
+            /d:sonar.inclusions="*" \
             /d:sonar.exclusions="**/*.java,Resources/**/*,Source/ThirdParty/**,build/**" \
             /d:sonar.cfamily.compile-commands="build/compile_commands.json" \
             /d:sonar.cfamily.threads=4 \
