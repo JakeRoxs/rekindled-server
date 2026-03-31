@@ -61,7 +61,6 @@ jobs:
             /n:"dsos" \
             /d:sonar.host.url="$SONAR_HOST_URL" \
             /d:sonar.token="$SONAR_TOKEN" \
-            /d:sonar.cxx.file.suffixes=.cpp,.c,.h,.hpp,.cxx,.cc \
             /d:sonar.scanner.scanAll=true \
             /d:sonar.sources=. \
             /d:sonar.exclusions="Source/ThirdParty/**,Protobuf/**,build/**,**/*.java" \
