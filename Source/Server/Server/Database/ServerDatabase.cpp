@@ -12,7 +12,7 @@
 #include "Config/BuildConfig.h"
 #include "Shared/Core/Utils/Logging.h"
 #include "Shared/Core/Utils/DebugObjects.h"
-#include "ThirdParty/sqlite/sqlite3.h"
+#include "sqlite3.h"
 
 ServerDatabase::ServerDatabase() {
 }
