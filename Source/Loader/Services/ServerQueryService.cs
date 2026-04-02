@@ -29,8 +29,11 @@ namespace Loader.Services
         return null;
       }
 
-      _internalCts?.Cancel();
-      _internalCts?.Dispose();
+      if (_internalCts != null)
+      {
+        await _internalCts.CancelAsync();
+        _internalCts.Dispose();
+      }
       _internalCts = new CancellationTokenSource();
 
       using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _internalCts.Token);
@@ -60,17 +63,25 @@ namespace Loader.Services
 
     public void Dispose()
     {
+      Dispose(true);
+      GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
       if (_disposed)
       {
         return;
       }
 
-      _internalCts?.Cancel();
-      _internalCts?.Dispose();
-      _internalCts = null;
+      if (disposing)
+      {
+        _internalCts?.Cancel();
+        _internalCts?.Dispose();
+        _internalCts = null;
+      }
 
       _disposed = true;
-      GC.SuppressFinalize(this);
     }
   }
 }

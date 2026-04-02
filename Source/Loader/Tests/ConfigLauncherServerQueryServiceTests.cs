@@ -70,8 +70,8 @@ namespace Loader.Tests
         public async Task ServerQueryService_QueryServersAsync_RespectsCancellation()
         {
             var service = new TestableServerQueryService();
-            var cts = new CancellationTokenSource();
-            cts.Cancel();
+            using var cts = new CancellationTokenSource();
+            await cts.CancelAsync();
 
             var result = await service.QueryServersAsync(cts.Token);
             Assert.IsNull(result);
@@ -89,9 +89,9 @@ namespace Loader.Tests
             Assert.AreEqual("demo", result[0].Name);
         }
 
-        private class TestableServerQueryService : Loader.Services.ServerQueryService
+        private sealed class TestableServerQueryService : Loader.Services.ServerQueryService
         {
-            protected override Task<List<ServerConfig>?> QueryServersFromHubAsync(CancellationToken cancellationToken)
+            public override Task<List<ServerConfig>?> QueryServersFromHubAsync(CancellationToken cancellationToken)
             {
                 return Task.FromResult<List<ServerConfig>?>(new List<ServerConfig> { new ServerConfig { Name = "demo" } });
             }

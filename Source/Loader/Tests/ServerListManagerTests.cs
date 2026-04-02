@@ -7,7 +7,7 @@ namespace Loader.Tests
     [TestClass]
     public class ServerListManagerTests
     {
-        private ServerConfigList MakeList(params ServerConfig[] servers)
+        private static ServerConfigList MakeList(params ServerConfig[] servers)
         {
             var list = new ServerConfigList();
             foreach (var s in servers)

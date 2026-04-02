@@ -58,4 +58,9 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Exclude testing sources from the main Loader app build, they belong in Loader.Tests project -->
+    <Compile Remove="Tests\**\*.cs" />
+  </ItemGroup>
+
 </Project>
