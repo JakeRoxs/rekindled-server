@@ -16,8 +16,6 @@ permissions:
   contents: read
 
 env:
-  BUILD_CONFIGURATION: Release
-
   # Version number being built.
   VERSION_NUMBER_POSTFIX: ${{ github.event.inputs.version_postfix }}
 
@@ -124,7 +122,11 @@ jobs:
 
       - name: Restore Loader NuGet packages
         if: matrix.name == 'windows-ninja'
-        run: dotnet restore ${{ env.LOADER_PROJECT_PATH }}
+        run: dotnet restore ${{ env.LOADER_PROJECT_PATH }} -p:Configuration=Release
+
+      - name: Restore Loader tests NuGet packages
+        if: matrix.name == 'windows-ninja'
+        run: dotnet restore ${{ env.LOADER_TESTS_PROJECT_PATH }} -p:Configuration=Release
 
       - name: Build Loader project
         if: matrix.name == 'windows-ninja'

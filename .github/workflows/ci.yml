@@ -19,9 +19,6 @@ concurrency:
   group: ci-${{ github.ref_name }}-${{ github.event_name }}
   cancel-in-progress: true
 
-env:
-  BUILD_CONFIGURATION: Release
-
 jobs:
   sonar:
     name: Trigger SonarQube workflow
@@ -293,7 +290,11 @@ jobs:
 
       - name: Restore Loader NuGet packages
         if: matrix.name == 'windows-ninja'
-        run: dotnet restore Source/Loader/Loader.csproj
+        run: dotnet restore Source/Loader/Loader.csproj -p:Configuration=Release
+
+      - name: Restore Loader tests NuGet packages
+        if: matrix.name == 'windows-ninja'
+        run: dotnet restore Source/Loader/Tests/Loader.Tests.csproj -p:Configuration=Release
 
       - name: Build Loader project
         if: matrix.name == 'windows-ninja'
