@@ -6,6 +6,7 @@ Formats YAML and source files in the repository.
 Uses npx to run Prettier for YAML (so no global install is required), then formats
 tracked Source/ C/C++ files via clang-format and Source/ C# projects via dotnet format.
 Using git ls-files ensures generated/untracked content (like /build) is excluded.
+`Source/ThirdParty` is explicitly excluded from Source formatting steps.
 #>
 
 param()
@@ -28,6 +29,7 @@ try {
         Write-Host "Formatting tracked Source/ C/C++ files with clang-format..."
         $clangExt = @('.h', '.hh', '.hpp', '.hxx', '.c', '.cc', '.cpp', '.cxx', '.inl', '.inc', '.ipp')
         $clangFiles = git ls-files Source | Where-Object {
+            if ($_ -like 'Source/ThirdParty/*') { return $false }
             $ext = [System.IO.Path]::GetExtension($_).ToLowerInvariant()
             $clangExt -contains $ext
         }
@@ -44,7 +46,7 @@ try {
 
     if (Get-Command dotnet -ErrorAction SilentlyContinue) {
         Write-Host "Formatting tracked Source/ C# projects with dotnet format..."
-        $csprojFiles = git ls-files "Source/**/*.csproj"
+        $csprojFiles = git ls-files "Source/**/*.csproj" | Where-Object { $_ -notlike 'Source/ThirdParty/*' }
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
         foreach ($proj in $csprojFiles) {

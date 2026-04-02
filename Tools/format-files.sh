@@ -3,6 +3,7 @@
 # Uses .prettierignore to skip vendored/generated directories for YAML.
 # Uses git ls-files for Source/ files so generated/untracked content (like /build)
 # is excluded automatically.
+# Source/ThirdParty is explicitly excluded from Source formatting steps.
 
 set -euo pipefail
 
@@ -19,6 +20,7 @@ if command -v clang-format >/dev/null 2>&1; then
   git ls-files Source \
     | while IFS= read -r file; do
         [[ -z "$file" ]] && continue
+        [[ "$file" == Source/ThirdParty/* ]] && continue
         case "${file##*.}" in
           h|hh|hpp|hxx|c|cc|cpp|cxx|inl|inc|ipp)
             clang-format -i --style=file "$file"
@@ -32,6 +34,7 @@ fi
 if command -v dotnet >/dev/null 2>&1; then
   echo "Formatting tracked Source/ C# projects with dotnet format..."
   git ls-files 'Source/**/*.csproj' | while IFS= read -r proj; do
+    [[ "$proj" == Source/ThirdParty/* ]] && continue
     [[ -n "$proj" ]] && dotnet format "$proj"
   done
 else

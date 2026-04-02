@@ -233,6 +233,8 @@ jobs:
         shell: bash
         run: |
           rm -f intermediate/make/CMakeCache.txt
+          rm -f intermediate/make/build.ninja
+          rm -f intermediate/make/cmake_install.cmake
           rm -rf intermediate/make/CMakeFiles
 
       - name: Clean stale CMake cache (Windows)
