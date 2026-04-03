@@ -66,7 +66,7 @@ HookError ReplaceServerPortHook::Install(const InjectorContext& context) {
   DetourTransactionBegin();
   DetourUpdateThread(GetCurrentThread());
 
-  s_original_connect = reinterpret_cast<connect_p>(static_cast<connect_p>(::connect));
+  s_original_connect = static_cast<connect_p>(::connect);
   DetourAttach(&(PVOID&)s_original_connect, ConnectHook);
 
   LONG result = DetourTransactionCommit();

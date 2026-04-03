@@ -22,10 +22,12 @@ struct DS2_CellAndAreaId {
   }
 };
 
+namespace std {
 template <>
-struct std::hash<DS2_CellAndAreaId> {
+struct hash<DS2_CellAndAreaId> {
   std::size_t operator()(const DS2_CellAndAreaId& k) const {
     return std::hash<size_t>()((size_t)k.AreaId) ^
            (std::hash<size_t>()((size_t)k.CellId) << 1);
   }
 };
+} // namespace std
