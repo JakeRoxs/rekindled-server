@@ -52,7 +52,7 @@ int WSAAPI ConnectHook(SOCKET s, const sockaddr* name, int namelen) {
 
   if (addr->sin_port == htons(redirect_port_number)) {
     Log("Attempt to connect to login server, patching port to '%i'.", instance->GetServerPort());
-    addr->sin_port = ntohs(instance->GetServerPort());
+    addr->sin_port = htons(instance->GetServerPort());
   }
 
   return s_original_connect(s, name, namelen);
@@ -66,7 +66,7 @@ HookError ReplaceServerPortHook::Install(const InjectorContext& context) {
   DetourTransactionBegin();
   DetourUpdateThread(GetCurrentThread());
 
-  s_original_connect = reinterpret_cast<connect_p>(connect);
+  s_original_connect = reinterpret_cast<connect_p>(static_cast<connect_p>(::connect));
   DetourAttach(&(PVOID&)s_original_connect, ConnectHook);
 
   LONG result = DetourTransactionCommit();

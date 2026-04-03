@@ -116,9 +116,9 @@ public:
         return ValidationResult::NRSSR_PropertyMetadata_InvalidType;
       }
 
-      auto ValidationResult = DS2_NRSSRSanitizer::ValidateEntryList(Msg.player_struct().data(), Msg.player_struct().size());
-      if (ValidationResult != ValidationResult::Valid) {
-        return ValidationResult;
+      auto result = DS2_NRSSRSanitizer::ValidateEntryList(Msg.player_struct().data(), Msg.player_struct().size());
+      if (result != ValidationResult::Valid) {
+        return result;
       }
       break;
     }

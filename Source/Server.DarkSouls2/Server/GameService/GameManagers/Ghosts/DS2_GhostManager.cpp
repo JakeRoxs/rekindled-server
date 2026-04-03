@@ -83,10 +83,10 @@ MessageHandleResult DS2_GhostManager::Handle_RequestCreateGhostData(GameClient* 
 
   // There is no NRSSR struct in ghost data, but we still make sure the size-delimited entry list is valid.
   if (BuildConfig::NRSSR_SANITY_CHECKS) {
-    auto ValidationResult = DS2_NRSSRSanitizer::ValidateEntryList(Data.data(), Data.size());
-    if (ValidationResult != DS2_NRSSRSanitizer::ValidationResult::Valid) {
-      WarningS(Client->GetName().c_str(), "Ghost data recieved from client is invalid (error code %i).",
-               static_cast<uint32_t>(ValidationResult));
+    auto result = DS2_NRSSRSanitizer::ValidateEntryList(Data.data(), Data.size());
+    if (result != DS2_NRSSRSanitizer::ValidationResult::Valid) {
+      WarningS(Client->GetName().c_str(), "Ghost data received from client is invalid (error code %i).",
+               static_cast<uint32_t>(result));
 
       return MessageHandleResult::Handled;
     }
