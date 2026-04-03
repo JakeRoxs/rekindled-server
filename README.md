@@ -14,6 +14,20 @@ English | [简体中文](./README_zhCN.md)
 
 This is a fork of the original DS3OS project, now rebranded as Rekindled Server.
 
+Most of the below is left for now until I get around to updating it lol
+
+## Current planned features:
+
+Federated asynchronous multiplayer mechanics (bloodstains/ghosts/messages) between servers/hubs(?)
+
+Modernize loader with Linux/Steam Deck support
+
+Hub dashbaord site with anonymized stats/graphs (number of bosses killed/bonfires lit/etc...)
+
+### Possibilites:
+
+Dark Souls PTD / Dark Souls 2 / Dark Souls Remastered support
+
 # What is this project?
 
 An open source implementation of the game servers for dark souls 2 (SOTFS) and 3.
@@ -244,6 +258,12 @@ There are also a lot of protobuf fields that are still unknown and use constant 
 server, determining what they represent would be a good improvement.
 
 # Credit
+
+Rekindled Banner Image: https://rezuaq.be/new-area/image-creator/
+
+Original Author/Repo: https://github.com/TLeonardUK/ds3os
+
+Their credits:
 
 A lot of the information needed to produce this implementation has been figured out by the community.
 Especially the members of the ?ServerName? souls modding discord.
