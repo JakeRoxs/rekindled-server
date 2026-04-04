@@ -199,7 +199,7 @@ namespace Loader
 
     protected virtual Task<List<ServerConfig>> QueryServersFromHubAsync(CancellationToken cancellationToken)
     {
-      // HubApi.ListServers can return null on failure.
+      // HubApi.ListServers now returns an empty list on failure instead of null.
       return Task.Run(() => HubApi.ListServers(), cancellationToken);
     }
 

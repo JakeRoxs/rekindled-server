@@ -125,10 +125,8 @@ namespace Loader
         }
         return Result.Servers;
       }
-      else
-      {
-        return null;
-      }
+
+      return new List<ServerConfig>();
     }
 
     public static string GetPublicKey(string ServerId, string Password)

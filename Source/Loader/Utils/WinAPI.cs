@@ -577,7 +577,7 @@ namespace Loader
         var handles = WinAPIProcesses.GetHandles(Proc, "Mutant", Name);
         if (handles.Count == 0)
         {
-          throw new System.ArgumentException("NoMutex", "original");
+          throw new ArgumentException("NoMutex", nameof(Name));
         }
 
         foreach (var handle in handles)

@@ -51,7 +51,7 @@ namespace Loader
       string[] Lines = File.ReadAllLines(ConfigVdfPath);
       foreach (string Trimmed in Lines.Select(Line => Line.Trim()))
       {
-        if (!Trimmed.StartsWith("\""))
+        if (Trimmed.Length == 0 || Trimmed[0] != '"')
         {
           continue;
         }
@@ -125,7 +125,7 @@ namespace Loader
       try
       {
         Process proc = Process.GetProcessById(Pid);
-        if (proc == null || proc.HasExited)
+        if (proc.HasExited)
         {
           return false;
         }

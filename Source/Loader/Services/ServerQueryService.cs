@@ -16,9 +16,7 @@ namespace Loader.Services
 
     public virtual Task<List<ServerConfig>?> QueryServersFromHubAsync(CancellationToken cancellationToken)
     {
-      // HubApi.ListServers can return null on failure.
-      return Task.Run(() => HubApi.ListServers(), cancellationToken);
-    }
+    // HubApi.ListServers now returns an empty list on failure instead of null.
 
     public async Task<List<ServerConfig>?> QueryServersAsync(CancellationToken cancellationToken)
     {

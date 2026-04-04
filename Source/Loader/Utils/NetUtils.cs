@@ -11,15 +11,14 @@ namespace Loader
 {
   public static class NetUtils
   {
+    private const string PublicIpServiceUrl = "https://api.ipify.org";
+
     public static string HostnameToIPv4(string Hostname)
     {
       try
       {
-        IPAddress[] Addresses = Dns.GetHostAddresses(Hostname);
-        foreach (IPAddress Addr in Addresses.Where(Addr => Addr.AddressFamily == AddressFamily.InterNetwork))
-        {
-          return Addr.ToString();
-        }
+        IPAddress? Address = Dns.GetHostAddresses(Hostname).FirstOrDefault(Addr => Addr.AddressFamily == AddressFamily.InterNetwork);
+        return Address?.ToString() ?? string.Empty;
       }
       catch (SocketException)
       {
@@ -41,7 +40,7 @@ namespace Loader
           using (HttpClient client = new HttpClient())
           {
             // synchronous call for simplicity
-            return client.GetStringAsync("http://api.ipify.org").GetAwaiter().GetResult();
+            return client.GetStringAsync(PublicIpServiceUrl).GetAwaiter().GetResult();
           }
         }
         else
