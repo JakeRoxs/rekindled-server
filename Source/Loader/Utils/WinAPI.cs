@@ -567,7 +567,7 @@ namespace Loader
 
     public static bool Is64Bits()
     {
-      return Marshal.SizeOf(typeof(IntPtr)) == 8;
+      return Marshal.SizeOf<IntPtr>() == 8;
     }
 
     public static bool KillMutex(Process Proc, string Name)
