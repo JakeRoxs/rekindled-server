@@ -308,10 +308,6 @@ jobs:
         if: matrix.name == 'windows-ninja'
         run: dotnet restore Source/Loader/Tests/Loader.Tests.csproj -p:Configuration=Release
 
-      - name: Restore Loader.Avalonia NuGet packages
-        if: matrix.name == 'windows-ninja'
-        run: dotnet restore Source/Loader.Avalonia/Loader.Avalonia.csproj -p:Configuration=Release
-
       - name: Build Loader project
         if: matrix.name == 'windows-ninja'
         run: dotnet build Source/Loader/Loader.csproj --configuration Release --no-restore
@@ -320,13 +316,20 @@ jobs:
         if: matrix.name == 'windows-ninja'
         run: dotnet build Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-restore
 
-      - name: Build Loader.Avalonia project
-        if: matrix.name == 'windows-ninja'
-        run: dotnet build Source/Loader.Avalonia/Loader.Avalonia.csproj --configuration Release --no-restore
-
       - name: Run Loader tests
         if: matrix.name == 'windows-ninja'
         run: dotnet test Source/Loader/Tests/Loader.Tests.csproj --configuration Release --verbosity normal
+
+      # Build Loader.Avalonia after Windows-only loader/tests to avoid shared
+      # BaseIntermediateOutputPath assets-file collisions between net10.0-windows
+      # and net10.0 projects.
+      - name: Restore Loader.Avalonia NuGet packages
+        if: matrix.name == 'windows-ninja'
+        run: dotnet restore Source/Loader.Avalonia/Loader.Avalonia.csproj -p:Configuration=Release
+
+      - name: Build Loader.Avalonia project
+        if: matrix.name == 'windows-ninja'
+        run: dotnet build Source/Loader.Avalonia/Loader.Avalonia.csproj --configuration Release --no-restore
 
       - name: Build on Windows (Ninja)
         if: matrix.name == 'windows-ninja'
