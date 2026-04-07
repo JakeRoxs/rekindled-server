@@ -65,9 +65,9 @@ jobs:
 
       - name: Restore Loader projects
         run: |
-          dotnet restore Source/Loader/Loader.csproj -p:EnableWindowsTargeting=true
-          dotnet restore Source/Loader/Tests/Loader.Tests.csproj -p:EnableWindowsTargeting=true
-          dotnet restore Source/Loader.Avalonia/Loader.Avalonia.csproj
+          dotnet restore Source/Loader/Loader.csproj -p:Configuration=Release -p:EnableWindowsTargeting=true
+          dotnet restore Source/Loader/Tests/Loader.Tests.csproj -p:Configuration=Release -p:EnableWindowsTargeting=true
+          dotnet restore Source/Loader.Avalonia/Loader.Avalonia.csproj -p:Configuration=Release
 
       - name: Install SonarScanner for .NET
         run: |
