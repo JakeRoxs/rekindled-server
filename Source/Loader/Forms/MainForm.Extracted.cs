@@ -58,11 +58,11 @@ namespace Loader
         LaunchButton.Text = resources.GetString("not_logged_into_steam");
       }
 #if RELEASE
-            else if (launcher.RunningProcessHandle != IntPtr.Zero)
-            {
-                LaunchEnabled = false;
-                LaunchButton.Text = resources.GetString("running");
-            }
+      else if (IsLaunchedProcessRunning())
+      {
+        LaunchEnabled = false;
+        LaunchButton.Text = resources.GetString("running");
+      }
 #endif
       else
       {
@@ -291,12 +291,14 @@ namespace Loader
       ValidateUI();
     }
 
+    private bool IsLaunchedProcessRunning()
+    {
+      return launcher.IsProcessRunning();
+    }
+
     private void OnContinualUpdateTimer(object sender, EventArgs e)
     {
-      uint ExitCode = 0;
-      if (launcher.RunningProcessHandle != IntPtr.Zero
-          && (!WinAPI.GetExitCodeProcess(launcher.RunningProcessHandle, out ExitCode)
-              || ExitCode != (uint)ProcessExitCodes.STILL_ACTIVE))
+      if (!IsLaunchedProcessRunning())
       {
         launcher.ClearProcess();
       }

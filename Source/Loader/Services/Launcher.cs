@@ -14,7 +14,7 @@ namespace Loader.Services
 
     public bool ShouldRunContinualUpdate()
     {
-      if (RunningProcessHandle != IntPtr.Zero)
+      if (IsProcessRunning())
       {
         return true;
       }
@@ -118,6 +118,26 @@ namespace Loader.Services
     {
       RunningProcessHandle = IntPtr.Zero;
       RunningProcessId = 0;
+    }
+
+    public bool IsProcessRunning()
+    {
+      if (RunningProcessId == 0)
+      {
+        return false;
+      }
+
+      try
+      {
+        using var process = Process.GetProcessById((int)RunningProcessId);
+        return !process.HasExited;
+      }
+      catch (ArgumentException)
+      {
+        RunningProcessHandle = IntPtr.Zero;
+        RunningProcessId = 0;
+        return false;
+      }
     }
 
     private bool TryRunInjector(ServerConfig config, string connectionHostname, bool useSeparateSaveFiles, PROCESS_INFORMATION processInfo, out string? errorMessage)

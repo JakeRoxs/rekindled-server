@@ -270,9 +270,6 @@ namespace Loader
     [DllImport("kernel32.dll")]
     public static extern uint SuspendThread(IntPtr hThread);
 
-    [DllImport("kernel32.dll")]
-    public static extern int GetLastError();
-
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool GetExitCodeProcess(IntPtr hProcess, out uint lpExitCode);
@@ -298,6 +295,9 @@ namespace Loader
 
     [DllImport("kernel32.dll")]
     public static extern IntPtr OpenProcess(ProcessAccessFlags dwDesiredAccess, [MarshalAs(UnmanagedType.Bool)] bool bInheritHandle, int dwProcessId);
+
+    [DllImport("kernel32.dll")]
+    public static extern uint GetProcessId(IntPtr hProcess);
 
     [DllImport("kernel32.dll")]
     public static extern int CloseHandle(IntPtr hObject);
@@ -328,11 +328,36 @@ namespace Loader
 
     public static IntPtr GetProcessModuleBaseAddress(IntPtr hProcess)
     {
-      IntPtr[] hMods = new IntPtr[1024];
+      try
+      {
+        int processId = unchecked((int)GetProcessId(hProcess));
+        using var process = Process.GetProcessById(processId);
+        if (process.MainModule != null)
+        {
+          return process.MainModule.BaseAddress;
+        }
 
+        Debug.WriteLine($"GetProcessModuleBaseAddress: Process {processId} returned null MainModule.");
+      }
+      catch (ArgumentException ex)
+      {
+        int lastError = Marshal.GetLastWin32Error();
+        Debug.WriteLine($"GetProcessModuleBaseAddress: Invalid process handle {hProcess}. Exception: {ex}. Marshal.GetLastWin32Error={lastError}");
+      }
+      catch (InvalidOperationException ex)
+      {
+        Debug.WriteLine($"GetProcessModuleBaseAddress: Process exited before module information could be read. Exception: {ex}");
+      }
+      catch (System.ComponentModel.Win32Exception ex)
+      {
+        Debug.WriteLine($"GetProcessModuleBaseAddress: Win32Exception when reading MainModule for handle {hProcess}. Exception: {ex}");
+      }
+
+      // Fall back to unmanaged module enumeration when the managed API cannot resolve the base address.
+      // Some process handle types (cross-architecture or system-level handles) may not expose MainModule via managed APIs.
+      IntPtr[] hMods = new IntPtr[1024];
       GCHandle hPinnedModules = GCHandle.Alloc(hMods, GCHandleType.Pinned);
       IntPtr pModules = hPinnedModules.AddrOfPinnedObject();
-
       uint uiSize = (uint)(Marshal.SizeOf(typeof(IntPtr)) * hMods.Length);
       uint cbNeeded = 0;
 
@@ -340,7 +365,6 @@ namespace Loader
       if (enumSucceeded)
       {
         Int32 uiTotalNumberofModules = (Int32)(cbNeeded / (Marshal.SizeOf(typeof(IntPtr))));
-
         for (int i = 0; i < uiTotalNumberofModules; i++)
         {
           MODULEINFO modInfo;
@@ -348,6 +372,7 @@ namespace Loader
           if (GetModuleInformation(hProcess, hMods[i], out modInfo, modInfoSize))
           {
             // First module is the one we want.
+            hPinnedModules.Free();
             return modInfo.lpBaseOfDll;
           }
         }
@@ -358,19 +383,18 @@ namespace Loader
         }
         else
         {
-          int lastError = GetLastError();
+          int lastError = Marshal.GetLastWin32Error();
           Debug.WriteLine($"GetProcessModuleBaseAddress: EnumProcessModulesEx succeeded but GetModuleInformation failed on all modules, lastError={lastError}");
         }
       }
       else
       {
-        int lastError = GetLastError();
+        int lastError = Marshal.GetLastWin32Error();
         Debug.WriteLine($"GetProcessModuleBaseAddress: EnumProcessModulesEx failed, error={lastError}");
       }
 
       hPinnedModules.Free();
-
-      return (IntPtr)0;
+      return IntPtr.Zero;
     }
   }
 
@@ -421,6 +445,8 @@ namespace Loader
 
       ipObjectType = Marshal.AllocHGlobal(objBasic.TypeInformationLength);
       nLength = objBasic.TypeInformationLength;
+      // The managed API surface does not expose kernel object type/name query for arbitrary handles.
+      // NtQueryObject is required here to resolve the object type information for the duplicated handle.
       while ((uint)WinAPI.NtQueryObject(
                       ipHandle,
                       (int)ObjectInformationClass.ObjectTypeInformation,
@@ -476,6 +502,8 @@ namespace Loader
       nLength = objBasic.NameInformationLength;
 
       ipObjectName = Marshal.AllocHGlobal(nLength);
+      // The managed API surface does not provide arbitrary object name resolution for duplicated handles.
+      // NtQueryObject is required here to query the kernel object name entry for the handle.
       while ((uint)WinAPI.NtQueryObject(
                ipHandle,
                (int)ObjectInformationClass.ObjectNameInformation,
@@ -503,6 +531,8 @@ namespace Loader
       int nLength = 0;
       IntPtr ipHandle = IntPtr.Zero;
 
+      // There is no managed equivalent for enumerating the system handle table across processes.
+      // NtQuerySystemInformation is required to retrieve the handle snapshot and filter it manually.
       while (WinAPI.NtQuerySystemInformation(
                               CNST_SYSTEM_HANDLE_INFORMATION,
                               ipHandlePointer,

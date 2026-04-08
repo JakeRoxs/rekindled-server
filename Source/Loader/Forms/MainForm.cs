@@ -168,7 +168,7 @@ namespace Loader
   class ServerListSorter : System.Collections.IComparer
   {
     public int SortColumn = 1;
-    public readonly int SortOrder = 0; // 0="Smart" Order, 1=Ascending, 2=Descending
+    public int SortOrder = 0; // 0="Smart" Order, 1=Ascending, 2=Descending
 
     public int Compare(object? x, object? y)
     {
