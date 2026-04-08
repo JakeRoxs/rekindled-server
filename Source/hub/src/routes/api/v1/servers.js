@@ -199,6 +199,10 @@ function sanitizeForLog(value, maxLength = 256) {
   return sanitized;
 }
 
+function safeLogValue(value, maxLength = 256) {
+  return JSON.stringify(sanitizeForLog(value, maxLength));
+}
+
 function validatePublicKey(value) {
   let key = String(value ?? "").trim();
   if (key.length === 0 || key.length > 4096) {
@@ -434,11 +438,11 @@ function persistServer(serverObj) {
     Name: name,
   } = serverObj;
 
-  const safeId = sanitizeForLog(id, 128);
-  const safeIpAddress = sanitizeForLog(ipAddress, 128);
-  const safePort = sanitizeForLog(port, 16);
-  const safeGameType = sanitizeForLog(gameType, 32);
-  const safeName = sanitizeForLog(name, 128);
+  const safeId = safeLogValue(id, 128);
+  const safeIpAddress = safeLogValue(ipAddress, 128);
+  const safePort = safeLogValue(port, 16);
+  const safeGameType = safeLogValue(gameType, 32);
+  const safeName = safeLogValue(name, 128);
 
   if (activeServers.has(id)) {
     activeServers.set(id, serverObj);
@@ -455,12 +459,12 @@ function persistServer(serverObj) {
 function addServer(serverData) {
   const serverObj = buildServerObject(serverData);
 
-  const safeId = sanitizeForLog(serverObj.Id, 128);
-  const safeHostname = sanitizeForLog(serverObj.Hostname, 128);
-  const safeIpAddress = sanitizeForLog(serverObj.IpAddress, 128);
-  const safePort = sanitizeForLog(serverObj.Port, 16);
-  const safeGameType = sanitizeForLog(serverObj.GameType, 32);
-  const safeName = sanitizeForLog(serverObj.Name, 128);
+  const safeId = safeLogValue(serverObj.Id, 128);
+  const safeHostname = safeLogValue(serverObj.Hostname, 128);
+  const safeIpAddress = safeLogValue(serverObj.IpAddress, 128);
+  const safePort = safeLogValue(serverObj.Port, 16);
+  const safeGameType = safeLogValue(serverObj.GameType, 32);
+  const safeName = safeLogValue(serverObj.Name, 128);
 
   if (!isServerAllowedToShard(serverObj) && serverObj.AllowSharding) {
     console.log(

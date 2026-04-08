@@ -30,7 +30,7 @@ namespace Loader.Tests
     public void GetProcessModuleBaseAddress_CurrentProcess_ReturnsNonZero()
     {
       using var process = Process.GetCurrentProcess();
-      IntPtr baseAddress = Loader.WinAPI.GetProcessModuleBaseAddress(process.Handle);
+      IntPtr baseAddress = Loader.WinAPI.GetProcessModuleBaseAddress(process.Id);
       Assert.AreNotEqual(IntPtr.Zero, baseAddress);
     }
   }

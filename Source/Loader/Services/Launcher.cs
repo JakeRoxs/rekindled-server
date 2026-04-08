@@ -51,16 +51,6 @@ namespace Loader.Services
         return false;
       }
 
-#if DEBUG
-      // Debug-only cleanup for a previously tracked running process.
-      // Only attempt to clear named mutexes when we still have a valid handle,
-      // since this is intended as a development-time workaround for stale mutex state.
-      if (RunningProcessHandle != IntPtr.Zero)
-      {
-        KillNamedMutexIfExists();
-      }
-#endif
-
       string connectionHostname = ResolveConnectIp(config, machinePublicIp, machinePrivateIp);
 
       if (!BuildConfig.ExeLoadConfiguration.TryGetValue(ExeUtils.GetExeSimpleHash(exeLocation), out var loadConfig))
@@ -232,7 +222,7 @@ namespace Loader.Services
 
       for (int i = 0; i < 32; i++)
       {
-        IntPtr baseAddress = WinAPI.GetProcessModuleBaseAddress(processInfo.hProcess);
+        IntPtr baseAddress = WinAPI.GetProcessModuleBaseAddress((int)processInfo.dwProcessId);
         IntPtr patchAddress = (IntPtr)loadConfig.ServerInfoAddress;
         if (loadConfig.UsesASLR)
         {
@@ -258,21 +248,5 @@ namespace Loader.Services
       return false;
     }
 
-#if DEBUG
-    private void KillNamedMutexIfExists()
-    {
-      if (RunningProcessId == 0)
-      {
-        return;
-      }
-
-      var existingProcess = Process.GetProcessById((int)RunningProcessId);
-      if (existingProcess != null)
-      {
-        WinAPIProcesses.KillMutex(existingProcess, "\\BaseNamedObjects\\DarkSoulsIIIMutex");
-        WinAPIProcesses.KillMutex(existingProcess, "\\BaseNamedObjects\\DarkSoulsIIMutex");
-      }
-    }
-#endif
   }
 }
