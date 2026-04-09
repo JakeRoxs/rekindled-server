@@ -88,6 +88,7 @@ rekindled.code-workspace
 /out/build/x64-Debug
 */obj/
 sonar-project.properties
+.ipynb_checkpoints/
 
 # Copilot stuff
 AGENTS.md
