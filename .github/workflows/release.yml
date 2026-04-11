@@ -126,43 +126,43 @@ jobs:
 
       - name: Restore Loader NuGet packages
         if: matrix.name == 'windows-ninja'
-        run: dotnet restore ${{ env.LOADER_PROJECT_PATH }} -p:Configuration=Release
+        run: dotnet restore ${{ env.LOADER_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64
 
       - name: Restore Loader tests NuGet packages
         if: matrix.name == 'windows-ninja'
-        run: dotnet restore ${{ env.LOADER_TESTS_PROJECT_PATH }} -p:Configuration=Release
+        run: dotnet restore ${{ env.LOADER_TESTS_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64
 
       - name: Build Loader project
         if: matrix.name == 'windows-ninja'
-        run: dotnet build ${{ env.LOADER_PROJECT_PATH }} --configuration Release --no-restore
+        run: dotnet build ${{ env.LOADER_PROJECT_PATH }} --configuration Release --no-restore -p:Platform=x64
 
       - name: Build Loader tests project
         if: matrix.name == 'windows-ninja'
-        run: dotnet build ${{ env.LOADER_TESTS_PROJECT_PATH }} --configuration Release --no-restore
+        run: dotnet build ${{ env.LOADER_TESTS_PROJECT_PATH }} --configuration Release --no-restore -p:Platform=x64
 
       - name: Run Loader tests
         if: matrix.name == 'windows-ninja'
-        run: dotnet test ${{ env.LOADER_TESTS_PROJECT_PATH }} --configuration Release --verbosity normal
+        run: dotnet test ${{ env.LOADER_TESTS_PROJECT_PATH }} --configuration Release --verbosity normal -p:Platform=x64
 
       - name: Restore Loader.Avalonia NuGet packages
         if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
-        run: dotnet restore ${{ env.LOADER_AVALONIA_PROJECT_PATH }} -p:Configuration=Release
+        run: dotnet restore ${{ env.LOADER_AVALONIA_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64
 
       - name: Build Loader.Avalonia project
         if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
-        run: dotnet build ${{ env.LOADER_AVALONIA_PROJECT_PATH }} --configuration Release --no-restore
+        run: dotnet build ${{ env.LOADER_AVALONIA_PROJECT_PATH }} --configuration Release --no-restore -p:Platform=x64
 
       - name: Restore Loader.Avalonia tests NuGet packages
         if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
-        run: dotnet restore ${{ env.LOADER_AVALONIA_TESTS_PROJECT_PATH }} -p:Configuration=Release
+        run: dotnet restore ${{ env.LOADER_AVALONIA_TESTS_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64
 
       - name: Build Loader.Avalonia tests project
         if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
-        run: dotnet build ${{ env.LOADER_AVALONIA_TESTS_PROJECT_PATH }} --configuration Release --no-restore
+        run: dotnet build ${{ env.LOADER_AVALONIA_TESTS_PROJECT_PATH }} --configuration Release --no-restore -p:Platform=x64
 
       - name: Run Loader.Avalonia tests
         if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
-        run: dotnet test ${{ env.LOADER_AVALONIA_TESTS_PROJECT_PATH }} --configuration Release --no-build --no-restore --verbosity normal
+        run: dotnet test ${{ env.LOADER_AVALONIA_TESTS_PROJECT_PATH }} --configuration Release --no-build --no-restore --verbosity normal -p:Platform=x64
 
       - name: Build on Windows (Ninja)
         if: matrix.name == 'windows-ninja'

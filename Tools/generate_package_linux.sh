@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 
-OUTPUT_ROOT="bin/x64_release"
+OUTPUT_ROOT="Bin/x64_Release"
 if [ ! -d "$OUTPUT_ROOT" ]; then
-  if [ -d "intermediate/build/bin/x64_release" ]; then
+  if [ -d "bin/x64_release" ]; then
+    OUTPUT_ROOT="bin/x64_release"
+  elif [ -d "Bin/AnyCPU_Release" ]; then
+    OUTPUT_ROOT="Bin/AnyCPU_Release"
+  elif [ -d "bin/AnyCPU_Release" ]; then
+    OUTPUT_ROOT="bin/AnyCPU_Release"
+  elif [ -d "intermediate/build/bin/x64_release" ]; then
     OUTPUT_ROOT="intermediate/build/bin/x64_release"
   elif [ -d "intermediate/build/Source/Server" ]; then
     OUTPUT_ROOT="intermediate/build/Source/Server"
@@ -68,15 +74,37 @@ else
 fi
 
 mkdir -p rekindled-server/Loader
-if [ -f "$OUTPUT_ROOT/Loader.Avalonia" ]; then
-  cp "$OUTPUT_ROOT/Loader.Avalonia" rekindled-server/Loader/
-  cp "$OUTPUT_ROOT/Loader.Avalonia.pdb" rekindled-server/Loader/ 2>/dev/null || true
-elif [ -d "Source/Loader.Avalonia/bin/Release/net10.0" ]; then
-  cp -R "Source/Loader.Avalonia/bin/Release/net10.0/" rekindled-server/Loader/
-elif [ -d "Source/Loader.Avalonia/bin/Release/net10.0-windows" ]; then
-  cp -R "Source/Loader.Avalonia/bin/Release/net10.0-windows/" rekindled-server/Loader/
+loader_output_dir=""
+for candidate in \
+  "$OUTPUT_ROOT/Loader.Avalonia" \
+  "Source/Loader.Avalonia/bin/Release/net10.0" \
+  "Source/Loader.Avalonia/bin/Release/net10.0-windows" \
+  "Source/Loader.Avalonia/bin/Release/net10.0/linux-x64" \
+  "Source/Loader.Avalonia/bin/Release/net10.0-windows/linux-x64" \
+  "Source/Loader.Avalonia/bin/Release/net10.0/" \
+  "Source/Loader.Avalonia/bin/Release/net10.0-windows/"; do
+  if [ -e "$candidate" ]; then
+    loader_output_dir="$candidate"
+    break
+  fi
+done
+
+if [ -n "$loader_output_dir" ]; then
+  if [ -d "$loader_output_dir" ]; then
+    cp -R "$loader_output_dir/" rekindled-server/Loader/
+  else
+    cp "$loader_output_dir" rekindled-server/Loader/
+    cp "${loader_output_dir}.pdb" rekindled-server/Loader/ 2>/dev/null || true
+  fi
 else
   echo "WARNING: Loader.Avalonia output not found in $OUTPUT_ROOT or Source/Loader.Avalonia/bin/Release"
+  echo "Candidate paths tried:"
+  echo "  $OUTPUT_ROOT/Loader.Avalonia"
+  echo "  Source/Loader.Avalonia/bin/Release/net10.0"
+  echo "  Source/Loader.Avalonia/bin/Release/net10.0-windows"
+  echo "  Source/Loader.Avalonia/bin/Release/net10.0/linux-x64"
+  echo "  Source/Loader.Avalonia/bin/Release/net10.0-windows/linux-x64"
+  ls -la Source/Loader.Avalonia/bin/Release 2>/dev/null || true
   ERR=1
 fi
 
