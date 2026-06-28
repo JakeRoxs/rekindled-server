@@ -29,7 +29,7 @@ jobs:
     name: SonarQube Loader (C#)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -39,7 +39,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Cache NuGet packages
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-sonarqube-${{ hashFiles('Source/Loader/**/*.csproj', 'Source/Loader.Avalonia/**/*.csproj', '**/Directory.Packages.props', '**/global.json', '**/nuget.config') }}
@@ -47,7 +47,7 @@ jobs:
             ${{ runner.os }}-nuget-sonarqube-
 
       - name: Cache SonarQube scanner plugins
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar-plugin-cache-loader-v1
@@ -56,7 +56,7 @@ jobs:
 
       - name: Cache SonarScanner for .NET tool
         id: cache-sonarscanner-tool
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/dotnet-sonarscanner
           key: ${{ runner.os }}-dotnet-sonarscanner-v1
@@ -136,7 +136,7 @@ jobs:
           [[ -n "$SONAR_TOKEN" ]] || { echo "SONAR_TOKEN is not set"; exit 1; }
           [[ -n "$SONAR_HOST_URL" ]] || { echo "SONAR_HOST_URL is not set"; exit 1; }
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -146,7 +146,7 @@ jobs:
           sudo apt-get install -y cmake ninja-build build-essential pkg-config libsqlite3-dev libssl-dev uuid-dev
 
       - name: Cache SonarQube scanner plugins
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.sonar/cache
           key: sonar-plugin-cache-${{ runner.os }}-v1

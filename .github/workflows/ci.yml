@@ -65,7 +65,7 @@ jobs:
       skipped: ${{ steps.determine.outputs.skipped }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -215,12 +215,12 @@ jobs:
           #   nixTarget: clang
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
       - name: Cache build artifacts
         if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             **/intermediate
