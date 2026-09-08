@@ -15,7 +15,7 @@ set(REKINDLED_CIVETWEB_ARCHIVE "" CACHE STRING "URL to a CivetWeb source archive
 set(REKINDLED_CIVETWEB_ARCHIVE_HASH "" CACHE STRING "Expected SHA256 of the CivetWeb archive (optional but strongly recommended when REKINDLED_CIVETWEB_ARCHIVE is set; leave empty to skip hash verification)")
 option(REKINDLED_CIVETWEB_ALLOW_REMOTE_FETCH "Allow automatically fetching CivetWeb via network when local source is unavailable" ON)
 set(REKINDLED_CIVETWEB_GIT_REPOSITORY "https://github.com/civetweb/civetweb.git" CACHE STRING "CivetWeb git repository to fetch if archive-based fetch is disabled")
-set(REKINDLED_CIVETWEB_GIT_TAG "master" CACHE STRING "CivetWeb branch/tag to checkout from the repository (use master for latest upstream fixes)")
+set(REKINDLED_CIVETWEB_GIT_TAG "3309a6cac05335aa4371a0c3750b42fbe05d3cb4" CACHE STRING "CivetWeb commit to checkout (pinned: upstream master is broken as of 2026-04-19 commit 588860e3)")
 
 set(REKINDLED_SQLITE_SOURCE_DIR "" CACHE PATH "Path to a local sqlite source tree to use instead of downloading it")
 # Prefers SQLite amalgamation package, which contains sqlite3.c/sqlite3.h/sqlite3ext.h in a stable layout for fallback builds.

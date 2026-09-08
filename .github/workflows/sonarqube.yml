@@ -27,7 +27,7 @@ env:
 jobs:
   sonar-loader:
     name: SonarQube Loader (C#)
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
         with:
@@ -82,11 +82,13 @@ jobs:
           dotnet tool update dotnet-sonarscanner --tool-path "$RUNNER_TEMP/dotnet-sonarscanner"
 
       - name: Add SonarScanner for .NET to PATH
+        shell: bash
         run: echo "$RUNNER_TEMP/dotnet-sonarscanner" >> "$GITHUB_PATH"
 
       - name: Run SonarScanner (Loader C#)
         id: scan_loader
         continue-on-error: true
+        shell: bash
         run: |
           mkdir -p "$GITHUB_WORKSPACE/TestResults/Loader"
           dotnet sonarscanner begin \
@@ -106,6 +108,7 @@ jobs:
       - name: Run SonarScanner (Loader Avalonia C#)
         id: scan_loader_avalonia
         continue-on-error: true
+        shell: bash
         run: |
           mkdir -p "$GITHUB_WORKSPACE/TestResults/Loader.Avalonia"
           dotnet sonarscanner begin \
