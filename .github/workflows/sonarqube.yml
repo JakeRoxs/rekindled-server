@@ -112,7 +112,8 @@ jobs:
             /d:sonar.qualitygate.wait="true"
           dotnet build Source/Loader/Loader.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
           dotnet build Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
-          dotnet test Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-build --no-restore --blame-hang-timeout 2m --blame-hang-dump-type none -p:EnableWindowsTargeting=true /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="$GITHUB_WORKSPACE/TestResults/Loader/coverage."
+          dotnet test Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-build --no-restore --blame-hang-timeout 2m --blame-hang-dump-type none -p:EnableWindowsTargeting=true /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="$GITHUB_WORKSPACE/TestResults/Loader/coverage"
+          test -s "$GITHUB_WORKSPACE/TestResults/Loader/coverage.opencover.xml" || { echo "OpenCover report is missing or empty"; exit 1; }
           dotnet sonarscanner end /d:sonar.login="$SONAR_TOKEN"
 
       - name: Run SonarScanner (Loader Avalonia C#)
@@ -134,7 +135,8 @@ jobs:
             /d:sonar.qualitygate.wait="true"
           dotnet build Source/Loader.Avalonia/Loader.Avalonia.csproj --configuration Release --no-restore
           dotnet build Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-restore
-          dotnet test Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-build --no-restore --blame-hang-timeout 2m --blame-hang-dump-type none /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="$GITHUB_WORKSPACE/TestResults/Loader.Avalonia/coverage."
+          dotnet test Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-build --no-restore --blame-hang-timeout 2m --blame-hang-dump-type none /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="$GITHUB_WORKSPACE/TestResults/Loader.Avalonia/coverage"
+          test -s "$GITHUB_WORKSPACE/TestResults/Loader.Avalonia/coverage.opencover.xml" || { echo "OpenCover report is missing or empty"; exit 1; }
           dotnet sonarscanner end /d:sonar.login="$SONAR_TOKEN"
 
       - name: Fail job if any Loader Sonar scan failed
