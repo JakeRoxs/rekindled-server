@@ -266,6 +266,8 @@ jobs:
             -Dsonar.projectName=rekindled-server-hub
             -Dsonar.sources=Source/hub/src
             -Dsonar.exclusions=**/node_modules/**
+            -Dsonar.test.inclusions=**/test/**,**/*.test.js
+            -Dsonar.coverage.exclusions=**/test/**,**/*.test.js
             -Dsonar.javascript.lcov.reportPaths=TestResults/hub/lcov.info
             -Dsonar.sourceEncoding=UTF-8
             -Dsonar.qualitygate.wait=true

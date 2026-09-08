@@ -69,6 +69,9 @@ enc_temp_folder/
 Publish/
 rekindled-server/
 node_modules/
+# JS test coverage artifacts (c8/nyc)
+coverage/
+.nyc_output/
 Tools/Utilities/ScyllaHide/
 Tools/Utilities/ServerAddressFinder/
 Tools/Deploy/
