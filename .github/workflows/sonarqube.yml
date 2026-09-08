@@ -59,9 +59,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/dotnet-sonarscanner
-          key: ${{ runner.os }}-dotnet-sonarscanner-v1
-          restore-keys: |
-            ${{ runner.os }}-dotnet-sonarscanner-
+          key: ${{ runner.os }}-dotnet-sonarscanner-11.3.0-v2
 
       - name: Validate SonarQube settings
         shell: bash
@@ -77,13 +75,22 @@ jobs:
           dotnet restore Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj -p:Configuration=Release
 
       - name: Install SonarScanner for .NET
-        if: steps.cache-sonarscanner-tool.outputs.cache-hit != 'true'
+        shell: pwsh
         run: |
-          dotnet tool update dotnet-sonarscanner --tool-path "$RUNNER_TEMP/dotnet-sonarscanner"
+          $scannerDir = Join-Path $env:RUNNER_TEMP 'dotnet-sonarscanner'
+          $scannerExe = Join-Path $scannerDir 'dotnet-sonarscanner.exe'
+          if (-not (Test-Path -LiteralPath $scannerExe)) {
+            dotnet tool update dotnet-sonarscanner --version 11.3.0 --tool-path $scannerDir
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          if (-not (Test-Path -LiteralPath $scannerExe)) {
+            throw "SonarScanner executable was not installed at $scannerExe"
+          }
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $scannerDir
 
-      - name: Add SonarScanner for .NET to PATH
-        shell: bash
-        run: echo "$RUNNER_TEMP/dotnet-sonarscanner" >> "$GITHUB_PATH"
+      - name: Verify SonarScanner is on PATH
+        shell: pwsh
+        run: Get-Command dotnet-sonarscanner -ErrorAction Stop
 
       - name: Run SonarScanner (Loader C#)
         id: scan_loader
@@ -102,7 +109,7 @@ jobs:
             /d:sonar.qualitygate.wait="true"
           dotnet build Source/Loader/Loader.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
           dotnet build Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
-          dotnet test Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-build --no-restore -p:EnableWindowsTargeting=true /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="$GITHUB_WORKSPACE/TestResults/Loader/coverage."
+          dotnet test Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-build --no-restore --blame-hang-timeout 2m --blame-hang-dump-type none -p:EnableWindowsTargeting=true /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="$GITHUB_WORKSPACE/TestResults/Loader/coverage."
           dotnet sonarscanner end /d:sonar.login="$SONAR_TOKEN"
 
       - name: Run SonarScanner (Loader Avalonia C#)
@@ -122,7 +129,7 @@ jobs:
             /d:sonar.qualitygate.wait="true"
           dotnet build Source/Loader.Avalonia/Loader.Avalonia.csproj --configuration Release --no-restore
           dotnet build Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-restore
-          dotnet test Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-build --no-restore /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="$GITHUB_WORKSPACE/TestResults/Loader.Avalonia/coverage."
+          dotnet test Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-build --no-restore --blame-hang-timeout 2m --blame-hang-dump-type none /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="$GITHUB_WORKSPACE/TestResults/Loader.Avalonia/coverage."
           dotnet sonarscanner end /d:sonar.login="$SONAR_TOKEN"
 
       - name: Fail job if any Loader Sonar scan failed
@@ -153,7 +160,14 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build build-essential pkg-config libsqlite3-dev libssl-dev uuid-dev gcovr
+          sudo apt-get install -y cmake ninja-build build-essential pkg-config libsqlite3-dev libssl-dev uuid-dev python3-venv
+
+      - name: Install coverage tools
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/gcovr"
+          "$RUNNER_TEMP/gcovr/bin/python" -m pip install 'gcovr==8.6'
+          "$RUNNER_TEMP/gcovr/bin/gcovr" --version
 
       - name: Cache SonarQube scanner plugins
         uses: actions/cache@v6
@@ -172,7 +186,14 @@ jobs:
         run: ctest --preset linux-debug
 
       - name: Generate C++ Cobertura coverage report (sonar-cxx)
-        run: gcovr --root . --xml --output intermediate/cmake/linux-debug/cpp-cobertura.xml --exclude 'Source/ThirdParty/.*' --exclude 'intermediate/.*'
+        shell: bash
+        run: >-
+          "$RUNNER_TEMP/gcovr/bin/gcovr"
+          --root .
+          --xml --output intermediate/cmake/linux-debug/cpp-cobertura.xml
+          --exclude 'Source/ThirdParty/.*'
+          --exclude 'intermediate/.*'
+          intermediate/cmake/linux-debug
 
       - uses: SonarSource/sonarqube-scan-action@v8
         with:

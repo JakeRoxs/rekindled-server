@@ -49,7 +49,11 @@ namespace Loader
 
     public static string OfficialServer = NetUtils.HostnameToIPv4("rekindled.jakesws.xyz");
 
-    public MainForm()
+    public MainForm() : this(NetUtils.GetMachineIPv4)
+    {
+    }
+
+    protected MainForm(Func<bool, string> getMachineIPv4)
     {
       InitializeComponent();
 
@@ -64,8 +68,8 @@ namespace Loader
       ImportedServerListView.Items.Clear();
       ImportedServerListView.ListViewItemSorter = new ServerListSorter();
 
-      MachinePrivateIp = NetUtils.GetMachineIPv4(false);
-      MachinePublicIp = NetUtils.GetMachineIPv4(true);
+      MachinePrivateIp = getMachineIPv4(false);
+      MachinePublicIp = getMachineIPv4(true);
 
       // manager will be initialized once config is loaded
       serverManager = new ServerListManager(ServerList, CurrentGameType);

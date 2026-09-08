@@ -48,6 +48,7 @@ jobs:
   # a failed or cancelled build with a successful skipped matrix.
   build:
     name: Build (matrix)
+    timeout-minutes: 45
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false

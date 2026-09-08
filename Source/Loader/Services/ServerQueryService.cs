@@ -25,7 +25,7 @@ namespace Loader.Services
     {
       Debug.WriteLine("Querying hub server ...");
 
-      if (IsQueryInProgress)
+      if (cancellationToken.IsCancellationRequested || IsQueryInProgress)
       {
         return null;
       }

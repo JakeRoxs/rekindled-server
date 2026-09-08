@@ -86,7 +86,9 @@ try {
                 $projectDirectory = Split-Path -Parent $project
                 $projectName = [IO.Path]::GetFileNameWithoutExtension($project)
                 $testProject = "$projectDirectory/Tests/$projectName.Tests.csproj"
-                Invoke-BuildCommand dotnet (@('test', $testProject) + $managedArgs + @('--verbosity', 'normal'))
+                Invoke-BuildCommand dotnet (@('test', $testProject) + $managedArgs + @(
+                    '--verbosity', 'normal', '--blame-hang-timeout', '2m', '--blame-hang-dump-type', 'none'
+                ))
             }
         }
     }
