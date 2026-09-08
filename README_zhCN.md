@@ -1,4 +1,4 @@
-![Dark Souls 3 - Open Server](./Resources/banner.png?raw=true)
+![Rekindled Server](./Resources/banner.png?raw=true)
 
 ![GitHub license](https://img.shields.io/github/license/jakeroxs/rekindled-server)
 ![GitHub release](https://img.shields.io/github/release/jakeroxs/rekindled-server)

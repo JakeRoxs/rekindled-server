@@ -108,6 +108,6 @@ services:
   #     interval: 30s
   #     timeout: 5s
   #     retries: 3
-  # By default the master server is disabled since most users just run the game server
+  # By default the hub server is disabled since most users just run the game server
   # Uncomment the above block or create a separate compose file if you want to host
-  # a public/master service alongside rekindled-ds3-server.
+  # a public hub service alongside rekindled-ds3-server.
