@@ -72,73 +72,11 @@ if (WIN32)
         Platform/Win32/Win32Platform.cpp
     )
 
-    # Prefer a fully-resolved Windows SDK dbghelp path so Ninja/MSVC can link even when
-    # LIB environment entries are not set in this shell.
-    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        set(_dbghelp_arch "x64")
-    else()
-        set(_dbghelp_arch "x86")
-    endif()
-
-    # Look for dbghelp in known Windows Kits install paths.
-    find_library(DBGHELP_LIBRARY NAMES dbghelp DbgHelp)
-
-    if(NOT DBGHELP_LIBRARY)
-        set(_win_kits_paths
-            "C:/Program Files (x86)/Windows Kits/10/Lib"
-            "C:/Program Files/Windows Kits/10/Lib"
-        )
-
-        foreach(_kits_path IN LISTS _win_kits_paths)
-            if(EXISTS "${_kits_path}")
-                file(GLOB DBGHELP_CANDIDATES "${_kits_path}/*/um/${_dbghelp_arch}/DbgHelp.Lib")
-                if(DBGHELP_CANDIDATES)
-                    list(SORT DBGHELP_CANDIDATES)
-                    list(REVERSE DBGHELP_CANDIDATES)
-                    list(GET DBGHELP_CANDIDATES 0 DBGHELP_LIBRARY)
-                    break()
-                endif()
-            endif()
-        endforeach()
-    endif()
-
-    if(NOT DBGHELP_LIBRARY)
-        message(WARNING "dbghelp library not found; stack trace/symbolization features may fail. Install the Windows SDK Debugging Tools component.")
-    endif()
-
-    # Look for platform/system libraries in known SDK and MSVC paths.
-    file(GLOB _windows_kit_lib_dirs
-        "C:/Program Files (x86)/Windows Kits/10/Lib/*/um/${_dbghelp_arch}"
-        "C:/Program Files/Windows Kits/10/Lib/*/um/${_dbghelp_arch}"
-        "C:/Program Files (x86)/Windows Kits/10/Lib/*/ucrt/${_dbghelp_arch}"
-        "C:/Program Files/Windows Kits/10/Lib/*/ucrt/${_dbghelp_arch}"
+    # Let the selected toolchain resolve its own SDK and runtime libraries.
+    set(PLATFORM_LIBRARIES
+        kernel32 user32 gdi32 winspool shell32 ole32 oleaut32 uuid
+        comdlg32 advapi32 rpcrt4 dbghelp crypt32 ws2_32
     )
-    file(GLOB _msvc_lib_dirs
-        "C:/Program Files/Microsoft Visual Studio/*/*/VC/Tools/MSVC/*/lib/${_dbghelp_arch}"
-        "C:/Program Files (x86)/Microsoft Visual Studio/*/*/VC/Tools/MSVC/*/lib/${_dbghelp_arch}"
-    )
-
-    set(_system_link_paths ${_windows_kit_lib_dirs} ${_msvc_lib_dirs})
-
-    set(_system_libs kernel32 user32 gdi32 winspool shell32 ole32 oleaut32 uuid comdlg32 advapi32 rpcrt4 dbghelp crypt32)
-
-    foreach(_lib IN LISTS _system_libs)
-        find_library(_found_${_lib} NAMES ${_lib} PATHS ${_system_link_paths} NO_DEFAULT_PATH)
-        if(NOT _found_${_lib})
-            find_library(_found_${_lib} NAMES ${_lib})
-        endif()
-
-        set(_found_var "_found_${_lib}")
-        if(DEFINED ${_found_var} AND NOT "${${_found_var}}" STREQUAL "")
-            list(APPEND PLATFORM_LIBRARIES "${${_found_var}}")
-        else()
-            message(WARNING "${_lib}.lib not found in SDK paths; using unqualified name (may fail if LIB path is missing).")
-            list(APPEND PLATFORM_LIBRARIES "${_lib}.lib")
-        endif()
-    endforeach()
-
-    # Avoid global link_directories; use target_link_directories for the shared library target.
-    # The _system_link_paths are already set above and reused by the target_link_directories call later.
 
 elseif (UNIX)
     SET(PLATFORM_SOURCES
@@ -170,20 +108,6 @@ else()
     )
 endif()
 
-message(STATUS "PLATFORM_LIBRARIES=${PLATFORM_LIBRARIES}")
-if(WIN32)
-    list(REMOVE_DUPLICATES PLATFORM_LIBRARIES)
-
-    # Avoid globally clobbering CMake's standard library defaults, which can break
-    # linking by removing runtime/system libraries for all targets in this scope.
-    # Keep the normal CMake standard runtime link handling, and ensure platform
-    # libs are resolved via explicit link directories/target_link_libraries.
-
-    if(_system_link_paths)
-        target_link_directories(${PROJECT_NAME} PRIVATE ${_system_link_paths})
-    endif()
-endif()
-
 target_link_libraries(
     ${PROJECT_NAME}
     PUBLIC
@@ -208,4 +132,6 @@ endif()
 # ThirdParty creates the correct openssl interface target with proper OpenSSL::Crypto/OpenSSL::SSL mapping.
 
 # build unit tests for shared utilities (if any)
-add_subdirectory(Tests)
+if(BUILD_TESTING)
+    add_subdirectory(Tests)
+endif()

@@ -14,12 +14,12 @@
 
 #include "ThirdParty/nlohmann/json.hpp"
 
-class WebUIHandler : public CivetHandler {
+class WebUIHandler {
 public:
   WebUIHandler(WebUIService* InService);
 
   // Used by derived classes to register all uri handlers.
-  virtual void Register(CivetServer* Server) = 0;
+  virtual void Register(httplib::Server* Server) = 0;
 
   // Called continually on the main thread, should be used to gather
   // any data that may need to be provided to the web-ui. Simplifies
@@ -33,9 +33,11 @@ public:
   virtual void MarkAsNeedsDataGather();
 
 protected:
-  void RespondJson(struct mg_connection* Connection, nlohmann::json& Json);
+  void RespondJson(httplib::Response& Res, nlohmann::json& Json);
 
-  bool ReadJson(CivetServer* Server, struct mg_connection* Connection, nlohmann::json& Json);
+  bool ReadJson(const httplib::Request& Req, nlohmann::json& Json);
+
+  void SendError(httplib::Response& Res, int Status, const std::string& Message);
 
 protected:
   WebUIService* Service;

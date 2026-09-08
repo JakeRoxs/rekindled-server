@@ -69,10 +69,16 @@ if (UNIX)
     target_compile_options(${PROJECT_NAME} PRIVATE -Wno-deprecated-declarations -Wno-deprecated-copy)
 endif()
 
-if (UNIX)
-    target_include_directories(${PROJECT_NAME} PUBLIC src gccprojects)
-else()
-    target_include_directories(${PROJECT_NAME} PUBLIC src vsprojects)
+# All modern compilers (MSVC 2015+, GCC, Clang, MinGW) provide the standard
+# unordered_map/unordered_set. Use the config that defines HASH_MAP_CLASS /
+# HASH_SET_CLASS / HASH_NAMESPACE, which hash.h's generic path requires.
+target_include_directories(${PROJECT_NAME} PUBLIC src gccprojects)
+
+if (MSVC)
+    # Modern MSVC (2015+) removed <hash_map>. Route hash.h to its generic branch
+    # (std::unordered_map via HASH_MAP_CLASS) instead of its MSVC-specific branch,
+    # which relies on the removed <hash_map> / hash_compare API.
+    target_compile_definitions(${PROJECT_NAME} PRIVATE -D_STLPORT_VERSION)
 endif()
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE -D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS -D_USRDLL -DLIBPROTOBUF_EXPORTS)

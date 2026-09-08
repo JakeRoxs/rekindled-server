@@ -21,8 +21,13 @@ PlayersHandler::PlayersHandler(WebUIService* InService)
     : WebUIHandler(InService) {
 }
 
-void PlayersHandler::Register(CivetServer* Server) {
-  Server->addHandler("/players", this);
+void PlayersHandler::Register(httplib::Server* Server) {
+  Server->Get("/players", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandleGet(Req, Res);
+  });
+  Server->Delete("/players", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandleDelete(Req, Res);
+  });
 }
 
 void PlayersHandler::GatherPlayerInfo(PlayerInfo& Info, std::shared_ptr<GameClient> Client) {
@@ -93,10 +98,10 @@ void PlayersHandler::GatherData() {
   PlayerInfos.erase(iter, PlayerInfos.end());
 }
 
-bool PlayersHandler::handleGet(CivetServer* Server, struct mg_connection* Connection) {
-  if (!Service->IsAuthenticated(Connection)) {
-    mg_send_http_error(Connection, 401, "Token invalid.");
-    return true;
+void PlayersHandler::HandleGet(const httplib::Request& Req, httplib::Response& Res) {
+  if (!Service->IsAuthenticated(&Req)) {
+    SendError(Res, 401, "Token invalid.");
+    return;
   }
 
   nlohmann::json json;
@@ -140,25 +145,23 @@ bool PlayersHandler::handleGet(CivetServer* Server, struct mg_connection* Connec
     json["players"] = playerArray;
   }
 
-  RespondJson(Connection, json);
+  RespondJson(Res, json);
 
   MarkAsNeedsDataGather();
-
-  return true;
 }
 
-bool PlayersHandler::handleDelete(CivetServer* Server, struct mg_connection* Connection) {
-  if (!Service->IsAuthenticated(Connection)) {
-    mg_send_http_error(Connection, 401, "Token invalid.");
-    return true;
+void PlayersHandler::HandleDelete(const httplib::Request& Req, httplib::Response& Res) {
+  if (!Service->IsAuthenticated(&Req)) {
+    SendError(Res, 401, "Token invalid.");
+    return;
   }
 
   nlohmann::json json;
-  if (!ReadJson(Server, Connection, json) ||
+  if (!ReadJson(Req, json) ||
       !json.contains("playerId") ||
       !json.contains("ban")) {
-    mg_send_http_error(Connection, 400, "Malformed body.");
-    return true;
+    SendError(Res, 400, "Malformed body.");
+    return;
   }
 
   uint32_t playerId = json["playerId"];
@@ -179,7 +182,5 @@ bool PlayersHandler::handleDelete(CivetServer* Server, struct mg_connection* Con
   }
 
   nlohmann::json responseJson;
-  RespondJson(Connection, responseJson);
-
-  return true;
+  RespondJson(Res, responseJson);
 }

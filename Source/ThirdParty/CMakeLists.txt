@@ -9,14 +9,6 @@ add_subdirectory(protobuf-2.6.1rc1)
 add_subdirectory(steam)
 add_subdirectory(zlib)
 
-# Deprecated vendor-style options remain for compatibility, but are no-op.
-set(REKINDLED_CIVETWEB_SOURCE_DIR "" CACHE PATH "Path to a local civetweb source tree to use instead of downloading it")
-set(REKINDLED_CIVETWEB_ARCHIVE "https://github.com/civetweb/civetweb/archive/3309a6cac05335aa4371a0c3750b42fbe05d3cb4.tar.gz" CACHE STRING "URL to a CivetWeb source archive to fetch when local source is unavailable (empty means use git main branch)")
-set(REKINDLED_CIVETWEB_ARCHIVE_HASH "SHA256=B99AD9A02783AE92F6CD17A335FBD07547AC80D195876D348FE1C14D4E12533E" CACHE STRING "Expected SHA256 of the CivetWeb archive (optional but strongly recommended when REKINDLED_CIVETWEB_ARCHIVE is set; leave empty to skip hash verification)")
-option(REKINDLED_CIVETWEB_ALLOW_REMOTE_FETCH "Allow automatically fetching CivetWeb via network when local source is unavailable" ON)
-set(REKINDLED_CIVETWEB_GIT_REPOSITORY "https://github.com/civetweb/civetweb.git" CACHE STRING "CivetWeb git repository to fetch if archive-based fetch is disabled")
-set(REKINDLED_CIVETWEB_GIT_TAG "3309a6cac05335aa4371a0c3750b42fbe05d3cb4" CACHE STRING "CivetWeb commit to checkout (pinned: upstream master is broken as of 2026-04-19 commit 588860e3)")
-
 set(REKINDLED_SQLITE_SOURCE_DIR "" CACHE PATH "Path to a local sqlite source tree to use instead of downloading it")
 # Prefers SQLite amalgamation package, which contains sqlite3.c/sqlite3.h/sqlite3ext.h in a stable layout for fallback builds.
 set(REKINDLED_SQLITE_ARCHIVE "https://sqlite.org/2026/sqlite-amalgamation-3510300.zip" CACHE STRING "URL to a SQLite source archive for FetchContent resolution when system sqlite is unavailable")
@@ -32,6 +24,9 @@ set(REKINDLED_CURL_SOURCE_DIR "" CACHE PATH "Path to a local curl source tree to
 
 include(FetchContent)
 include(ExternalProject)
+
+# Consumers need libcurl, not curl's standalone command-line application.
+set(BUILD_CURL_EXE OFF CACHE BOOL "Build the curl command-line application")
 
 set(REKINDLED_DEP_FETCH_STATUS_FILE "${CMAKE_BINARY_DIR}/dependency-fetch-status.txt" CACHE FILEPATH "Path to a file recording which deps were fetched vs vendored")
 # Clear/initialize status file on each configure pass
@@ -102,134 +97,52 @@ function(rekindled_set_fetchcontent_source_dir_if_cached)
     endif()
 endfunction()
 
-# CivetWeb
-if(REKINDLED_CIVETWEB_SOURCE_DIR)
-    rekindled_append_dep_status("civetweb: local source")
-    add_subdirectory(${REKINDLED_CIVETWEB_SOURCE_DIR})
+# HttpLib (cpp-httplib)
+# Replaces civetweb as the embedded WebUI HTTP server. cpp-httplib is a
+# header-only C++ HTTP server/client library. It is resolved via FetchContent
+# (a local source tree, or a pinned git tag) so nothing is vendored by hand.
+# We keep it minimal (HTTP only, no optional SSL/compression features) to match
+# the previous HTTP-only WebUI.
+set(REKINDLED_HTTPLIB_SOURCE_DIR "" CACHE PATH "Path to a local cpp-httplib source tree to use instead of downloading it")
+option(REKINDLED_HTTPLIB_ALLOW_REMOTE_FETCH "Allow automatically fetching cpp-httplib via network when local source is unavailable" ON)
+set(REKINDLED_HTTPLIB_GIT_REPOSITORY "https://github.com/yhirose/cpp-httplib.git" CACHE STRING "cpp-httplib git repository to fetch")
+set(REKINDLED_HTTPLIB_GIT_TAG "v0.54.1" CACHE STRING "cpp-httplib branch/tag to checkout (pinned release)")
+
+# Keep cpp-httplib a clean, HTTP-only header-only interface (no optional features).
+set(HTTPLIB_USE_OPENSSL_IF_AVAILABLE OFF CACHE BOOL "Disable HTTPS support in cpp-httplib" FORCE)
+set(HTTPLIB_USE_ZLIB_IF_AVAILABLE OFF CACHE BOOL "Disable zlib compression in cpp-httplib" FORCE)
+set(HTTPLIB_USE_BROTLI_IF_AVAILABLE OFF CACHE BOOL "Disable brotli support in cpp-httplib" FORCE)
+set(HTTPLIB_USE_ZSTD_IF_AVAILABLE OFF CACHE BOOL "Disable zstd support in cpp-httplib" FORCE)
+set(HTTPLIB_INSTALL OFF CACHE BOOL "Disable install rules for cpp-httplib" FORCE)
+set(HTTPLIB_TEST OFF CACHE BOOL "Disable cpp-httplib unit tests" FORCE)
+
+if(REKINDLED_HTTPLIB_SOURCE_DIR)
+    rekindled_append_dep_status("httplib: local source")
+    FetchContent_Declare(
+        httplib
+        SOURCE_DIR "${REKINDLED_HTTPLIB_SOURCE_DIR}"
+    )
 else()
-    # CivetWeb upstream sets -pedantic-errors by default in many paths and can
-    # fail on compilers that do not support OS-specific language extension tokens.
-    set(CIVETWEB_ALLOW_WARNINGS ON CACHE BOOL "Do not treat warnings as errors in CivetWeb" FORCE)
-    # Disable ASAN for civetweb on Windows to avoid clang sanitizer Win32 dependency issues during link.
-        set(CIVETWEB_ENABLE_ASAN OFF CACHE BOOL "Disable ASAN for civetweb in rekindled" FORCE)
-    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fms-extensions")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fms-extensions")
-    endif()
-    # Prefer a CivetWeb archive if configured, for consistent non-vendored dependency flow.
-    if(DEFINED REKINDLED_CIVETWEB_ARCHIVE AND REKINDLED_CIVETWEB_ARCHIVE)
-        set(_civetweb_use_archive TRUE)
-        set(_civetweb_url "${REKINDLED_CIVETWEB_ARCHIVE}")
-        set(_civetweb_hash "${REKINDLED_CIVETWEB_ARCHIVE_HASH}")
-    else()
-        set(_civetweb_use_archive FALSE)
+    if(NOT REKINDLED_HTTPLIB_ALLOW_REMOTE_FETCH)
+        message(FATAL_ERROR "No cpp-httplib source provided and remote fetch is disabled (REKINDLED_HTTPLIB_ALLOW_REMOTE_FETCH=OFF). Provide REKINDLED_HTTPLIB_SOURCE_DIR.")
     endif()
 
-    message(STATUS "CivetWeb: archive-enabled=${_civetweb_use_archive} archive-url=${REKINDLED_CIVETWEB_ARCHIVE} allow-remote=${REKINDLED_CIVETWEB_ALLOW_REMOTE_FETCH}")
+    message(STATUS "Fetching cpp-httplib from ${REKINDLED_HTTPLIB_GIT_REPOSITORY}@${REKINDLED_HTTPLIB_GIT_TAG}")
+    rekindled_append_dep_status("httplib: fetched git")
 
-    set(_civetweb_src_dir "${CMAKE_BINARY_DIR}/_deps/civetweb-src")
-    rekindled_set_fetchcontent_source_dir_if_cached("civetweb" "${_civetweb_src_dir}")
-
-    if(_civetweb_use_archive)
-        set(_civetweb_archive "${CMAKE_BINARY_DIR}/_deps/civetweb-archive.tar.gz")
-        rekindled_fetch_archive_if_missing("civetweb" "${_civetweb_url}" "${_civetweb_archive}" "${_civetweb_hash}")
-        rekindled_append_dep_status("civetweb: ${civetweb_FETCH_STATUS}_archive")
-
-        if(_civetweb_hash)
-            FetchContent_Declare(
-                civetweb
-                URL "${_civetweb_archive}"
-                URL_HASH ${_civetweb_hash}
-                SOURCE_DIR "${_civetweb_src_dir}"
-            )
-        else()
-            FetchContent_Declare(
-                civetweb
-                URL "${_civetweb_archive}"
-                SOURCE_DIR "${_civetweb_src_dir}"
-            )
-        endif()
-    else()
-        if(NOT REKINDLED_CIVETWEB_ALLOW_REMOTE_FETCH)
-            message(FATAL_ERROR "No CivetWeb archive provided and remote fetch is disabled (REKINDLED_CIVETWEB_ALLOW_REMOTE_FETCH=OFF). Provide REKINDLED_CIVETWEB_ARCHIVE or REKINDLED_CIVETWEB_SOURCE_DIR.")
-        endif()
-
-        message(STATUS "Fetching CivetWeb from ${REKINDLED_CIVETWEB_GIT_REPOSITORY}@${REKINDLED_CIVETWEB_GIT_TAG}")
-        rekindled_append_dep_status("civetweb: fetched git")
-
-        FetchContent_Declare(
-            civetweb
-            GIT_REPOSITORY "${REKINDLED_CIVETWEB_GIT_REPOSITORY}"
-            GIT_TAG "${REKINDLED_CIVETWEB_GIT_TAG}"
-            GIT_SHALLOW TRUE
-            GIT_PROGRESS TRUE
-            SOURCE_DIR "${_civetweb_src_dir}"
-        )
-    endif()
-
-    FetchContent_GetProperties(civetweb)
-    if(NOT civetweb_POPULATED)
-        # Older releases of CivetWeb use low cmake_minimum_required values.
-        # Patch their CMakeLists before it is processed.
-        if(POLICY CMP0169)
-            cmake_policy(SET CMP0169 OLD)
-        endif()
-        FetchContent_Populate(civetweb)
-        if(POLICY CMP0169)
-            cmake_policy(SET CMP0169 NEW)
-        endif()
-    endif()
-
-    # Patch CivetWeb's CMakeLists if needed (covers both initial fetch and cached content).
-    set(_civet_cmake "${civetweb_SOURCE_DIR}/CMakeLists.txt")
-    if(EXISTS "${_civet_cmake}")
-        if(NOT IS_DIRECTORY "${_civet_cmake}")
-            file(READ "${_civet_cmake}" _civ RESULT_VARIABLE _civ_read_result)
-            if(_civ_read_result EQUAL 0)
-                set(_civ_orig "${_civ}")
-                string(REPLACE "cmake_minimum_required (VERSION 3.3.0)" "cmake_minimum_required (VERSION 3.10)" _civ "${_civ}")
-                string(REPLACE "cmake_policy(VERSION 3.2.2)" "cmake_policy(VERSION 3.10)" _civ "${_civ}")
-                if(NOT _civ STREQUAL "${_civ_orig}")
-                    file(WRITE "${_civet_cmake}" "${_civ}")
-                    message(STATUS "Patched CivetWeb CMakeLists.txt to use a newer CMake policy/requirement")
-                endif()
-            else()
-                message(STATUS "Unable to read CivetWeb CMakeLists.txt (${_civet_cmake}); continuing without patch: ${_civ_read_result}")
-            endif()
-        else()
-            message(WARNING "CivetWeb CMakeLists.txt exists but is a directory: ${_civet_cmake}")
-        endif()
-    else()
-        message(WARNING "CivetWeb CMakeLists.txt missing: ${_civet_cmake}")
-    endif()
-
-    # Disable civetweb unit tests / external project downloads (e.g., check-unit-test-framework).
-    set(CIVETWEB_BUILD_TESTING OFF CACHE BOOL "Disable CivetWeb unit tests" FORCE)
-
-    # Enable the C++ wrapper library so downstream code can link against the
-    # CivetHandler/CivetServer C++ API.
-    set(CIVETWEB_ENABLE_CXX ON CACHE BOOL "Enable the CivetWeb C++ wrapper" FORCE)
-
-    add_subdirectory(${civetweb_SOURCE_DIR} ${civetweb_BINARY_DIR})
-    # Upstream civetweb provides a C++ wrapper target (civetweb-cpp) that
-    # includes CivetHandler/CivetServer. If present, prefer it as the
-    # canonical "civetweb" target. Otherwise, fall back to the C API library.
-    if(TARGET civetweb-cpp AND NOT TARGET civetweb)
-        add_library(civetweb ALIAS civetweb-cpp)
-    elseif(TARGET civetweb-c-library AND NOT TARGET civetweb)
-        add_library(civetweb ALIAS civetweb-c-library)
-    endif()
-    if(TARGET civetweb-cpp)
-        target_compile_options(civetweb-cpp PRIVATE
-            $<$<OR:$<C_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:Clang>>:-Wno-error=language-extension-token -Wno-language-extension-token>
-        )
-    endif()
-    if(TARGET civetweb-c-library)
-        target_compile_options(civetweb-c-library PRIVATE
-            $<$<OR:$<C_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:Clang>>:-Wno-error=language-extension-token -Wno-language-extension-token>
-        )
-    endif()
+    FetchContent_Declare(
+        httplib
+        GIT_REPOSITORY "${REKINDLED_HTTPLIB_GIT_REPOSITORY}"
+        GIT_TAG "${REKINDLED_HTTPLIB_GIT_TAG}"
+        GIT_SHALLOW TRUE
+        GIT_PROGRESS TRUE
+    )
 endif()
+
+FetchContent_MakeAvailable(httplib)
+
+# cpp-httplib provides both `httplib` and the `httplib::httplib` alias, so
+# either name is already linkable from downstream targets.
 
 # SQLite
 # Fallback path: local source -> system package -> archive fetch.
@@ -573,26 +486,8 @@ else()
                     endif()
                 endif()
 
-                if(WIN32)
-                    set(_openssl_need_nmake TRUE)
-                    if(CMAKE_GENERATOR MATCHES "Ninja")
-                        set(_openssl_need_nmake FALSE)
-                        message(STATUS "Ninja generator detected; nmake.exe check is optional for non-nmake generators.")
-                    endif()
-                else()
-                    set(_openssl_need_nmake FALSE)
-                endif()
-
-            if(_openssl_need_nmake)
-                find_program(_openssl_nmake_executable NAMES nmake.exe mingw32-make make)
-                if(_openssl_nmake_executable)
-                    message(STATUS "Found OpenSSL build executable: ${_openssl_nmake_executable}")
-                else()
-                    message(WARNING "nmake/mingw32-make/make not found in PATH; OpenSSL source build may fail. Install Visual Studio Build Tools or MinGW build tools.")
-                endif()
-            elseif(WIN32)
-                message(STATUS "Skipping nmake.exe requirement for Ninja generator; will try to use ${_openssl_nmake_executable} if available or fallback tools.")
-            endif()
+                # OpenSSL uses nmake with MSVC regardless of the parent generator.
+                set(_openssl_need_nmake ${MSVC})
 
             if(NOT _openssl_perl_executable)
                 if(WIN32 AND REKINDLED_OPENSSL_BOOTSTRAP_PERL)
@@ -683,7 +578,7 @@ else()
 
             if(WIN32)
                 # OpenSSL for Windows may be built using MSVC (nmake) or MinGW (mingw32-make).
-                if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
+                if(NOT MSVC)
                     set(_openssl_mingw_build TRUE)
                 else()
                     set(_openssl_mingw_build FALSE)
@@ -706,13 +601,11 @@ else()
                 # Detect vcvars for accurate MSVC toolchain environment inside external project commands.
                 set(_openssl_vcvarsall "")
                 if(NOT _openssl_mingw_build)
-                    if(DEFINED ENV{VSINSTALLDIR})
+                    if(CMAKE_GENERATOR_INSTANCE)
+                        string(REGEX REPLACE ",.*$" "" _openssl_vs_root "${CMAKE_GENERATOR_INSTANCE}")
+                        set(_openssl_vcvarsall "${_openssl_vs_root}/VC/Auxiliary/Build/vcvars64.bat")
+                    elseif(DEFINED ENV{VSINSTALLDIR})
                         set(_openssl_vcvarsall "$ENV{VSINSTALLDIR}/VC/Auxiliary/Build/vcvars64.bat")
-                    else()
-                        get_filename_component(_cl_bin_dir "${CMAKE_CXX_COMPILER}" DIRECTORY)
-                        # Expected: .../VC/Tools/MSVC/<ver>/bin/Hostx64/x64
-                        get_filename_component(_msvc_tools_dir "${_cl_bin_dir}" DIRECTORY 4)
-                        set(_openssl_vcvarsall "${_msvc_tools_dir}/VC/Auxiliary/Build/vcvars64.bat")
                     endif()
                 endif()
 
@@ -750,7 +643,9 @@ else()
             if(NOT _openssl_nmake_executable AND DEFINED ENV{VSINSTALLDIR})
                 set(_vs_install_dir $ENV{VSINSTALLDIR})
                 file(GLOB _nmake_fallback "${_vs_install_dir}/VC/Tools/MSVC/*/bin/Hostx64/x64/nmake.exe")
-                list(GET _nmake_fallback 0 _openssl_nmake_executable)
+                if(_nmake_fallback)
+                    list(GET _nmake_fallback 0 _openssl_nmake_executable)
+                endif()
             endif()
 
             if(_openssl_need_nmake AND NOT _openssl_nmake_executable)
@@ -813,9 +708,9 @@ else()
 
                 file(WRITE "${_openssl_install_script}" "#!/usr/bin/env bash\nset -euo pipefail\ncd \"${_openssl_source_dir}\"\nmake install_sw\n")
 
-                set(_openssl_configure_cmd "${CMAKE_COMMAND} -E sh \"${_openssl_configure_script}\"")
-                set(_openssl_build_cmd "${CMAKE_COMMAND} -E sh \"${_openssl_build_script}\"")
-                set(_openssl_install_cmd "${CMAKE_COMMAND} -E sh \"${_openssl_install_script}\"")
+                set(_openssl_configure_cmd bash "${_openssl_configure_script}")
+                set(_openssl_build_cmd bash "${_openssl_build_script}")
+                set(_openssl_install_cmd bash "${_openssl_install_script}")
             endif()
 
             ExternalProject_Add(openssl_fetched_build

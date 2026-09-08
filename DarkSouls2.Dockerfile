@@ -9,30 +9,9 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY ./ /build
-WORKDIR /build/Tools
-# strip any CRLF bytes from script; host may check out with Windows endings
-RUN sed -i 's/\r$//' ./generate_make_release.sh && \
-    ./generate_make_release.sh -DBUILD_LOADER_AVALONIA=OFF
 WORKDIR /build
-RUN cd intermediate/make && (if [ -f build.ninja ]; then ninja -j$(nproc || echo 4); else make -j$(nproc || echo 4); fi)
-
-# Ensure canonical output path exists and copy Server from known build outputs.
-RUN mkdir -p /build/bin/x64_release && \
-    if [ -f /build/intermediate/make/Source/Server/Server ]; then \
-        cp /build/intermediate/make/Source/Server/Server /build/bin/x64_release/Server; \
-    elif [ -f /build/intermediate/make/Source/Server.DarkSouls3/Server ]; then \
-        cp /build/intermediate/make/Source/Server.DarkSouls3/Server /build/bin/x64_release/Server; \
-    elif [ -f /build/intermediate/make/Source/Server.DarkSouls2/Server ]; then \
-        cp /build/intermediate/make/Source/Server.DarkSouls2/Server /build/bin/x64_release/Server; \
-    fi && \
-    if [ ! -f /build/bin/x64_release/Server ]; then \
-        echo "Error: Server executable not found in known build output locations"; exit 1; \
-    fi
-
-# Ensure canonical output exists before transitioning to runtime stage
-RUN if [ ! -d /build/bin/x64_release ]; then \
-      echo "Error: canonical build output directory /build/bin/x64_release not found"; exit 1; \
-    fi
+RUN cmake --preset linux-release -DBUILD_TESTING=OFF && \
+    cmake --build --preset linux-release --target Server --parallel "$(nproc)"
 
 FROM steamcmd/steamcmd:latest@sha256:0e3dd116a002dfe756581e35ccf84591fc8b2bbd126a247f2c7de7061b901f23 AS steam
 
@@ -75,7 +54,7 @@ RUN echo "$STEAM_APP_ID" >> /opt/rekindled-ds2s-server/steam_appid.txt
 
 # Copy only the built runtime outputs from the build stage into the runtime image.
 # Avoid copying the full /build tree to keep image size small.
-COPY --from=build /build/bin/x64_release/. /opt/rekindled-ds2s-server/
+COPY --from=build /build/intermediate/cmake/linux-release/bin/Release/. /opt/rekindled-ds2s-server/
 
 # Optional debug output during build (comment out in production):
 # RUN ls -al /opt/rekindled-ds2s-server && find /opt/rekindled-ds2s-server -maxdepth 4 -type f -print

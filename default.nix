@@ -7,6 +7,7 @@
     , writeShellApplication
     , jq
     , xz
+    , runCommand
 }:
 
 # build deps
@@ -21,10 +22,21 @@ with builtins;
 with lib;
 
 let
-    civetwebArchive = builtins.fetchurl {
-      url = "https://github.com/civetweb/civetweb/archive/refs/tags/v1.15.tar.gz";
-      sha256 = "scstgqrjisvte6spxomwt4eelug3ubjvj6okztr2kac7uwpvso4q";
+    # cpp-httplib: pre-fetch the source tree so the Nix build stays hermetic and
+    # CMake's FetchContent consumes it via REKINDLED_HTTPLIB_SOURCE_DIR.
+    httplibArchive = builtins.fetchurl {
+      url = "https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.54.1.tar.gz";
+      sha256 = "omipkmjocqrygdletm4o2auotw4gga5jphgl7w6rysyvot2cfx5q";
     };
+
+    httplibSrc = runCommand "cpp-httplib-v0.54.1" {
+      nativeBuildInputs = [ xz ];
+    } ''
+      tar -xzf ${httplibArchive}
+      # The archive extracts to a single top-level directory; expose it as the
+      # source tree consumed by FetchContent.
+      mv cpp-httplib-0.54.1 $out
+    '';
 
     opensslArchive = builtins.fetchurl {
       url = "https://github.com/kzalewski/openssl-1.1.1/archive/refs/tags/1.1.1ze.tar.gz";
@@ -50,10 +62,7 @@ let
         enableParallelBuilding = true;
 
         installPhase = ''
-            install -Dm755 ../bin/x64_release/libsteam_api.so $out/lib/libsteam_api.so
-            install -Dm755 ../bin/x64_release/Server $out/bin/Server
-            mkdir -p $out/share/rekindled-server
-            cp -R ../bin/x64_release/WebUI $out/share/rekindled-server/WebUI
+            cmake --install . --config Release --prefix "$out" --component Runtime
             '';
 
         # google's generated protobuf headers puts absolute file path garbage into the binaries
@@ -63,6 +72,8 @@ let
             '';
 
         cmakeFlags = [
+            "-DBUILD_TESTING=OFF"
+            "-DCMAKE_BUILD_TYPE=Release"
             # Fix third party builds
             "-DCMAKE_C_STANDARD=99"
             "-DCMAKE_C_FLAGS=-Wno-implicit-function-declaration"
@@ -70,7 +81,7 @@ let
             # Prefer using FetchContent to download third-party sources at configure time
             # (falls back to system libraries if available).
             # When using Nix, supply the pre-fetched archive paths so CMake doesn't need network access.
-            "-DREKINDLED_CIVETWEB_ARCHIVE=file://${civetwebArchive}"
+            "-DREKINDLED_HTTPLIB_SOURCE_DIR=${httplibSrc}"
             "-DREKINDLED_OPENSSL_ARCHIVE=file://${opensslArchive}"
             "-DREKINDLED_CURL_ARCHIVE=file://${curlArchive}"
         ];

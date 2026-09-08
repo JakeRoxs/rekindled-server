@@ -25,9 +25,9 @@ class ShardingHandler : public WebUIHandler {
 public:
   ShardingHandler(WebUIService* InService);
 
-  virtual bool handlePost(CivetServer* Server, struct mg_connection* Connection) override;
+  void HandlePost(const httplib::Request& Req, httplib::Response& Res);
 
-  virtual void Register(CivetServer* Server) override;
+  virtual void Register(httplib::Server* Server) override;
 
 protected:
   std::unordered_map<std::string, std::string> RequestHashToServerId;

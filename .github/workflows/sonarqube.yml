@@ -163,16 +163,16 @@ jobs:
           restore-keys: sonar-plugin-cache-${{ runner.os }}-
 
       - name: Configure CMake (generates compile_commands.json)
-        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_FLAGS="--coverage -O0 -g" -DCMAKE_CXX_FLAGS="--coverage -O0 -g"
+        run: cmake --preset linux-debug -DCMAKE_C_FLAGS="--coverage -O0 -g" -DCMAKE_CXX_FLAGS="--coverage -O0 -g"
 
       - name: Build C++ targets with coverage instrumentation
-        run: cmake --build build -j"$(nproc)"
+        run: cmake --build --preset linux-debug --parallel "$(nproc)"
 
       - name: Run C++ tests
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --preset linux-debug
 
       - name: Generate C++ Cobertura coverage report (sonar-cxx)
-        run: gcovr --root . --xml --output build/cpp-cobertura.xml --exclude 'Source/ThirdParty/.*' --exclude 'build/.*'
+        run: gcovr --root . --xml --output intermediate/cmake/linux-debug/cpp-cobertura.xml --exclude 'Source/ThirdParty/.*' --exclude 'intermediate/.*'
 
       - uses: SonarSource/sonarqube-scan-action@v8
         with:
@@ -180,9 +180,9 @@ jobs:
             -Dsonar.projectKey=JakeRoxs_server_9178fbff-b3bf-4c2c-9c34-efc7eb852932
             -Dsonar.projectName=rekindled-server
             -Dsonar.sources=.
-            -Dsonar.exclusions=Source/ThirdParty/**,Protobuf/**,build/**,Source/Loader/**,Resources/**
-            -Dsonar.cfamily.compile-commands=build/compile_commands.json
-            -Dsonar.cxx.cobertura.reportPaths=build/cpp-cobertura.xml
+            -Dsonar.exclusions=Source/ThirdParty/**,Protobuf/**,intermediate/**,build/**,Source/Loader/**,Resources/**
+            -Dsonar.cfamily.compile-commands=intermediate/cmake/linux-debug/compile_commands.json
+            -Dsonar.cxx.cobertura.reportPaths=intermediate/cmake/linux-debug/cpp-cobertura.xml
             -Dsonar.cfamily.threads=4
             -Dsonar.sourceEncoding=UTF-8
             -Dsonar.verbose=true

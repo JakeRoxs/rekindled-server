@@ -90,7 +90,7 @@ target_compile_definitions(${PROJECT_NAME} PUBLIC BUILD_DARKSOULS2)
 target_link_libraries(
     ${PROJECT_NAME}
     Shared
-    civetweb
+    httplib
     libprotobuf-lite
     sqlite
     steam

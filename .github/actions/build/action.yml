@@ -1,0 +1,49 @@
+name: Build Rekindled
+description: Set up tools and run the repository build entry point
+inputs:
+  preset:
+    description: Native CMake configure/build/test preset
+    required: true
+  configuration:
+    description: Build configuration
+    default: Release
+  component:
+    description: All, Native, or Managed
+    default: All
+  test:
+    description: Run native and managed tests after building
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Setup .NET SDK
+      if: inputs.component != 'Native'
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Cache NuGet packages
+      if: inputs.component != 'Native'
+      uses: actions/cache@v6
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-ci-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props', '**/packages.lock.json', '**/NuGet.Config', '**/nuget.config', '**/global.json') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-ci-
+
+    - name: Install native dependencies (Linux)
+      if: runner.os == 'Linux' && inputs.component != 'Managed'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake ninja-build libssl-dev zlib1g-dev libsqlite3-dev pkg-config uuid-dev
+
+    - name: Build and test
+      shell: pwsh
+      env:
+        BUILD_PRESET: ${{ inputs.preset }}
+        BUILD_CONFIGURATION: ${{ inputs.configuration }}
+        BUILD_COMPONENT: ${{ inputs.component }}
+        BUILD_TEST: ${{ inputs.test }}
+      run: |
+        ./Tools/build.ps1 -Preset $env:BUILD_PRESET -Configuration $env:BUILD_CONFIGURATION -Component $env:BUILD_COMPONENT -Test:($env:BUILD_TEST -eq 'true')

@@ -1,0 +1,9 @@
+<Project>
+  <!-- All-component builds provide the exact native output tree. Managed-only
+       builds do not search for or copy an injector from an older build. -->
+  <Target Name="CopyRekindledInjector" AfterTargets="Build"
+          Condition="'$(RekindledNativeOutputDir)' != '' and ('$(MSBuildProjectName)' == 'Loader' or '$(MSBuildProjectName)' == 'Loader.Avalonia')">
+    <Copy SourceFiles="$(RekindledNativeOutputDir)/Injector.dll"
+          DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

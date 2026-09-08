@@ -12,13 +12,13 @@
 
 #include "Server/Service.h"
 
-#include <civetweb.h>
-#include <CivetServer.h>
+#include <httplib.h>
 
 #include <memory>
 #include <vector>
 #include <unordered_map>
 #include <mutex>
+#include <thread>
 
 class Server;
 class WebUIHandler;
@@ -39,12 +39,12 @@ public:
   virtual std::string GetName() override;
 
   Server* GetServer() { return ServerInstance; }
-  std::shared_ptr<CivetServer> GetWebServer() { return WebServer; }
+  httplib::Server* GetWebServer() { return WebServer.get(); }
 
 public:
   bool CheckAuthToken(const std::string& Token);
   std::string AddAuthToken();
-  bool IsAuthenticated(const mg_connection* Connection);
+  bool IsAuthenticated(const httplib::Request* Req);
   void ClearExpiredTokens();
 
   void GatherData();
@@ -57,7 +57,8 @@ private:
 
   Server* ServerInstance;
 
-  std::shared_ptr<CivetServer> WebServer;
+  std::unique_ptr<httplib::Server> WebServer;
+  std::thread WebThread;
 
   std::vector<std::shared_ptr<WebUIHandler>> Handlers;
 

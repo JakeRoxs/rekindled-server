@@ -26,8 +26,8 @@ class BansHandler : public WebUIHandler {
 public:
   BansHandler(WebUIService* InService);
 
-  virtual bool handleGet(CivetServer* Server, struct mg_connection* Connection) override;
-  virtual bool handleDelete(CivetServer* Server, struct mg_connection* Connection) override;
+  void HandleGet(const httplib::Request& Req, httplib::Response& Res);
+  void HandleDelete(const httplib::Request& Req, httplib::Response& Res);
 
-  virtual void Register(CivetServer* Server) override;
+  virtual void Register(httplib::Server* Server) override;
 };

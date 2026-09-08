@@ -85,8 +85,10 @@ rekindled.code-workspace
 *.vscode*
 /build*
 /compile_commands.json
+/CMakeUserPresets.json
 /out/build/x64-Debug
 */obj/
+**/TestResults/
 sonar-project.properties
 .ipynb_checkpoints/
 
@@ -98,4 +100,3 @@ copilot-instructions.md
 /.github/skills
 /todos
 /docs
-

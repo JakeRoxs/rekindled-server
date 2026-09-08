@@ -3,427 +3,67 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-      - development
+    branches: [main, development]
   pull_request:
-    branches:
-      - main
-      - development
+    branches: [main, development]
 
 permissions:
   contents: read
-  actions: write
 
 concurrency:
-  group: ci-${{ github.ref_name }}-${{ github.event_name }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
   sonar:
     name: Trigger SonarQube workflow
+    # SonarQube already handles pushes and PRs targeting main itself.
+    # Dispatch only repository refs; fork and Dependabot PRs have read-only tokens.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/development') ||
+      (github.event_name == 'pull_request' &&
+       github.base_ref == 'development' &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]')
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
-      - name: Trigger sonarqube.yml via workflow dispatch
+      - name: Dispatch SonarQube analysis
         uses: actions/github-script@v9
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const githubContext = (github && github.context) ? github.context : (typeof context !== 'undefined' ? context : {});
-            const payload = githubContext.payload || {};
-            const prRef = payload.pull_request && payload.pull_request.head && payload.pull_request.head.ref;
-            const pushRef = githubContext.ref || process.env.GITHUB_REF;
-            const workflowDispatchRef = payload.ref;
-
-            // Prefer PR head ref for pull_request events.
-            let ref = prRef || workflowDispatchRef || pushRef || 'refs/heads/main';
-
-            if (typeof ref === 'string') {
-              if (ref.startsWith('refs/heads/')) {
-                ref = ref.replace('refs/heads/', '');
-              } else if (ref.startsWith('refs/tags/')) {
-                ref = ref.replace('refs/tags/', '');
-              }
-            }
-
-            const branch = ref || 'main';
-            console.log(`Dispatching sonarqube.yml on ref: ${branch}`);
-
-            await github.request('POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches', {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+            const ref = context.payload.pull_request?.head.ref
+              ?? context.ref.replace(/^refs\/(heads|tags)\//, '');
+            core.info(`Dispatching sonarqube.yml on ref: ${ref}`);
+            await github.rest.actions.createWorkflowDispatch({
+              ...context.repo,
               workflow_id: 'sonarqube.yml',
-              ref: branch,
-              inputs: {
-                branch: branch
-              }
+              ref,
+              inputs: { branch: ref }
             });
-  check:
-    name: Determine whether CI should run
-    runs-on: ubuntu-latest
-    outputs:
-      skipped: ${{ steps.determine.outputs.skipped }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
-      - name: Determine whether CI should run
-        id: determine
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-        run: |
-          set -euo pipefail
-
-          # Determine the range to diff (push vs PR)
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_SHA=${{ github.event.pull_request.base.sha }}
-            HEAD_SHA=${{ github.event.pull_request.head.sha }}
-            BRANCH="$PR_HEAD_REF"
-
-            # Use just the latest commit delta for the skip decision in PR flows, so non-build tweaks
-            # after an earlier full build do not retrigger the entire matrix.
-            if PREV_COMMIT=$(git rev-parse --verify "${HEAD_SHA}^1" 2>/dev/null); then
-              COMMIT_BASE=$PREV_COMMIT
-              COMMIT_HEAD=$HEAD_SHA
-            else
-              COMMIT_BASE=$BASE_SHA
-              COMMIT_HEAD=$HEAD_SHA
-            fi
-          else
-            BASE_SHA=${{ github.event.before }}
-            HEAD_SHA=${{ github.sha }}
-            BRANCH=${GITHUB_REF_NAME}
-            COMMIT_BASE=$BASE_SHA
-            COMMIT_HEAD=$HEAD_SHA
-          fi
-
-          # If there's no valid base commit (new branch / force push), run CI.
-          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            echo "::notice::No base commit available; running CI."
-            echo "skipped=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          echo "Comparing full PR range $BASE_SHA..$HEAD_SHA"
-          echo "Comparing commit delta $COMMIT_BASE..$COMMIT_HEAD"
-
-          if ! CHANGED=$(git diff --name-only "$COMMIT_BASE" "$COMMIT_HEAD"); then
-            echo "::warning::git diff failed; running CI by default."
-            echo "skipped=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          printf "Changed files:\n%s\n" "$CHANGED"
-
-          real=0
-          while IFS= read -r f; do
-            # .nix files are build-relevant for nix-based matrix jobs
-            if [[ "$f" == *.nix ]]; then
-              real=1
-              break
-            fi
-
-            case "$f" in
-              # Always run CI if we change the CI workflow itself.
-              .github/workflows/ci.yml)
-                real=1
-                break
-                ;;
-
-              # Build-relevant changes (run CI)
-              CMakeLists.txt)
-                real=1
-                break
-                ;;
-              Source/*)
-                real=1
-                break
-                ;;
-              Protobuf/*)
-                real=1
-                break
-                ;;
-              Resources/*)
-                real=1
-                break
-                ;;
-              Tools/*)
-                real=1
-                break
-                ;;
-
-
-              # Everything else is considered non-build (docs/tooling/etc.)
-              # and will not trigger the full matrix.
-              *)
-                continue
-                ;;
-            esac
-          done < <(printf '%s\n' "$CHANGED")
-
-          if [ "$real" -eq 0 ]; then
-            # If the last completed workflow run on this branch failed, re-run CI.
-            # (This ensures we don't silently skip CI if a prior run failed and no build-relevant changes were made.)
-          if [ -z "${GITHUB_TOKEN:-}" ]; then
-            echo "::notice::GITHUB_TOKEN is unavailable; forcing CI to run (safe default)."
-            real=1
-          else
-            prev_conclusion=$(curl -sSfL -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs?branch=$BRANCH&per_page=5" 2>/dev/null | python -c 'import json,sys; runs=json.load(sys.stdin).get("workflow_runs", []); current=int(sys.argv[1]); print(next((r.get("conclusion", "") for r in runs if r.get("id") != current and r.get("status") == "completed"), ""))' "$GITHUB_RUN_ID" 2>/dev/null || true)
-
-            if [ -n "$prev_conclusion" ] && [ "$prev_conclusion" != "success" ]; then
-              echo "::notice::Previous CI run on branch '$BRANCH' concluded as '$prev_conclusion'; running CI."
-              real=1
-            fi
-          fi
-          fi
-
-          if [ "$real" -eq 0 ]; then
-            echo "::notice::Skipping CI: only docs/workflow files changed and previous run succeeded."
-            echo "skipped=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::CI decision: skipped=true (no build-relevant changes detected)"
-          else
-            echo "skipped=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::CI decision: skipped=false (build-relevant changes detected or previous run failed)"
-          fi
+  # Always validate the current revision. A docs-only follow-up must not replace
+  # a failed or cancelled build with a successful skipped matrix.
   build:
     name: Build (matrix)
-    needs: check
-    if: needs.check.outputs.skipped != 'true'
     runs-on: ${{ matrix.os }}
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: windows-ninja
-            os: windows-latest
-            generator: Ninja
-          - name: linux-ninja
-            os: ubuntu-latest
-            generator: Ninja
-          # Nix builds temporarily disabled
-          # - name: nix-gcc
-          #   os: ubuntu-latest
-          #   nixTarget: default
-          # - name: nix-clang
-          #   os: ubuntu-latest
-          #   nixTarget: clang
+          - os: windows-latest
+            preset: windows-release
+          - os: ubuntu-latest
+            preset: linux-release
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           submodules: recursive
-      - name: Cache build artifacts
-        if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
-        uses: actions/cache@v6
+
+      - name: Build and test
+        uses: ./.github/actions/build
         with:
-          path: |
-            **/intermediate
-            ~/.nuget/packages
-          key: ${{ runner.os }}-build-${{ github.repository }}-${{ hashFiles('**/*.csproj','**/CMakeLists.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-build-
-
-      - name: Clean stale CMake cache (Linux)
-        if: matrix.name == 'linux-ninja'
-        shell: bash
-        run: |
-          rm -f intermediate/make/CMakeCache.txt
-          rm -f intermediate/make/build.ninja
-          rm -f intermediate/make/cmake_install.cmake
-          rm -rf intermediate/make/CMakeFiles
-          rm -rf intermediate/make/_deps/*-subbuild
-          rm -rf intermediate/make/_deps/*-tmp
-          rm -rf intermediate/make/_deps/*-build
-
-      - name: Clean stale CMake cache (Windows)
-        if: matrix.name == 'windows-ninja'
-        shell: cmd
-        run: |
-          if exist intermediate\build\CMakeCache.txt del /f /q intermediate\build\CMakeCache.txt
-          if exist intermediate\build\CMakeFiles rmdir /s /q intermediate\build\CMakeFiles
-
-      - name: Generate build files (Windows)
-        if: matrix.name == 'windows-ninja'
-        shell: cmd
-        env:
-          GENERATOR: Ninja
-        run: |
-          for /f "delims=" %%V in ('"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set "VS_INSTALL_DIR=%%V"
-          if defined VS_INSTALL_DIR (
-            echo Using VSINSTALLDIR=%%VS_INSTALL_DIR%%
-            call "%%VS_INSTALL_DIR%%\VC\Auxiliary\Build\vcvars64.bat"
-          ) else (
-            echo VSInstallDir not found; trying default path
-            if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
-              call "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-            ) else (
-              echo Warning: vcvars64.bat not found in default location. Proceeding without it.
-            )
-          )
-          cd "%GITHUB_WORKSPACE%\Tools"
-          "%GITHUB_WORKSPACE%\Tools\generate_build.bat"
-
-      - name: Report dependency fetch status (Windows)
-        if: matrix.name == 'windows-ninja'
-        shell: cmd
-        run: |
-          if exist intermediate\build\dependency-fetch-status.txt (
-            type intermediate\build\dependency-fetch-status.txt
-          ) else (
-            echo "(dependency-fetch-status.txt not found)"
-          )
-
-      - name: Report dependency fetch status (Linux)
-        if: matrix.name == 'linux-ninja'
-        shell: bash
-        run: |
-          status_file="${{ github.workspace }}/intermediate/make/dependency-fetch-status.txt"
-          if [[ -f "$status_file" ]]; then
-            cat "$status_file"
-          else
-            echo "(dependency-fetch-status.txt not found)"
-          fi
-
-      - name: Add MSBuild to PATH
-        if: matrix.name == 'windows-ninja'
-        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
-
-      - name: Setup .NET SDK
-        if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
-        uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Restore Loader NuGet packages
-        if: matrix.name == 'windows-ninja'
-        run: dotnet restore Source/Loader/Loader.csproj -p:Configuration=Release
-
-      - name: Restore Loader tests NuGet packages
-        if: matrix.name == 'windows-ninja'
-        run: dotnet restore Source/Loader/Tests/Loader.Tests.csproj -p:Configuration=Release
-
-      - name: Build Loader project
-        if: matrix.name == 'windows-ninja'
-        run: dotnet build Source/Loader/Loader.csproj --configuration Release --no-restore
-
-      - name: Build Loader tests project
-        if: matrix.name == 'windows-ninja'
-        run: dotnet build Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-restore
-
-      - name: Run Loader tests
-        if: matrix.name == 'windows-ninja'
-        run: dotnet test Source/Loader/Tests/Loader.Tests.csproj --configuration Release --verbosity normal
-
-      # Build Loader.Avalonia after Windows-only loader/tests to avoid shared
-      # BaseIntermediateOutputPath assets-file collisions between net10.0-windows
-      # and net10.0 projects.
-      - name: Restore Loader.Avalonia NuGet packages
-        if: matrix.name == 'windows-ninja'
-        run: dotnet restore Source/Loader.Avalonia/Loader.Avalonia.csproj -p:Configuration=Release
-
-      - name: Build Loader.Avalonia project
-        if: matrix.name == 'windows-ninja'
-        run: dotnet build Source/Loader.Avalonia/Loader.Avalonia.csproj --configuration Release --no-restore
-
-      - name: Restore Loader.Avalonia tests NuGet packages
-        if: matrix.name == 'windows-ninja'
-        run: dotnet restore Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj -p:Configuration=Release
-
-      - name: Build Loader.Avalonia tests project
-        if: matrix.name == 'windows-ninja'
-        run: dotnet build Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-restore
-
-      - name: Run Loader.Avalonia tests (Windows)
-        if: matrix.name == 'windows-ninja'
-        run: dotnet test Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-build --no-restore --verbosity normal
-
-      - name: Build on Windows (Ninja)
-        if: matrix.name == 'windows-ninja'
-        working-directory: ${{github.workspace}}/intermediate/build
-        shell: cmd
-        run: |
-          for /f "delims=" %%V in ('"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set "VS_INSTALL_DIR=%%V"
-          if defined VS_INSTALL_DIR (
-            echo Using VSINSTALLDIR=%%VS_INSTALL_DIR%%
-            call "%%VS_INSTALL_DIR%%\VC\Auxiliary\Build\vcvars64.bat"
-          ) else (
-            echo VSInstallDir not found; trying default path
-            if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
-              call "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-            ) else (
-              echo Warning: vcvars64.bat not found in default location. Proceeding without it.
-            )
-          )
-          if defined NUMBER_OF_PROCESSORS (
-            set /A JOBS=%NUMBER_OF_PROCESSORS%
-          ) else (
-            set /A JOBS=0
-          )
-          if %JOBS% GTR 0 (
-            ninja -j %JOBS%
-          ) else (
-            ninja
-          )
-      - name: Install required development packages (Linux)
-        if: matrix.name == 'linux-ninja'
-        run: |
-          set -euxo pipefail
-          sudo apt-get update
-          # Required for building OpenSSL/curl/zlib/sqlite, and cmake to generate build files.
-          sudo apt-get install -y cmake ninja-build libssl-dev zlib1g-dev libsqlite3-dev pkg-config
-          # UUID is used by the project; different distros name it differently.
-          sudo apt-get install -y uuid-dev || sudo apt-get install -y libuuid-dev
-
-      - name: Restore Loader.Avalonia NuGet packages (Linux)
-        if: matrix.name == 'linux-ninja'
-        run: dotnet restore Source/Loader.Avalonia/Loader.Avalonia.csproj -p:Configuration=Release
-
-      - name: Build Loader.Avalonia project (Linux)
-        if: matrix.name == 'linux-ninja'
-        run: dotnet build Source/Loader.Avalonia/Loader.Avalonia.csproj --configuration Release --no-restore
-
-      - name: Restore Loader.Avalonia tests NuGet packages (Linux)
-        if: matrix.name == 'linux-ninja'
-        run: dotnet restore Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj -p:Configuration=Release
-
-      - name: Build Loader.Avalonia tests project (Linux)
-        if: matrix.name == 'linux-ninja'
-        run: dotnet build Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-restore
-
-      - name: Run Loader.Avalonia tests (Linux)
-        if: matrix.name == 'linux-ninja'
-        run: dotnet test Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-build --no-restore --verbosity normal
-
-      - name: Generate Solution (Linux)
-        if: matrix.name == 'linux-ninja'
-        shell: bash
-        run: |
-          cd "${{ github.workspace }}/Tools"
-          GENERATOR=Ninja "${{ github.workspace }}/Tools/generate_make_release.sh"
-
-      - name: Build on Linux (Ninja)
-        if: matrix.name == 'linux-ninja'
-        working-directory: ${{github.workspace}}/intermediate/make
-        run: ninja -j$(nproc)
-
-      # - name: Install Nix
-      #   if: startsWith(matrix.name, 'nix-')
-      #   uses: DeterminateSystems/nix-installer-action@main
-
-      # - name: Setup nix cache
-      #   if: startsWith(matrix.name, 'nix-')
-      #   uses: DeterminateSystems/magic-nix-cache-action@main
-      #   with:
-      #     use-flakehub: false
-
-      # - name: Build with nix
-      #   if: startsWith(matrix.name, 'nix-')
-      #   run: |
-      #     target="${{ matrix.nixTarget == 'default' && '.' || matrix.nixTarget == 'clang' && '.#clang' || matrix.nixTarget }}"
-      #     nix build -L "$target"
+          preset: ${{ matrix.preset }}

@@ -17,29 +17,32 @@ AuthHandler::AuthHandler(WebUIService* InService)
     : WebUIHandler(InService) {
 }
 
-void AuthHandler::Register(CivetServer* Server) {
-  Server->addHandler("/auth", this);
+void AuthHandler::Register(httplib::Server* Server) {
+  Server->Get("/auth", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandleGet(Req, Res);
+  });
+  Server->Post("/auth", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandlePost(Req, Res);
+  });
 }
 
-bool AuthHandler::handleGet(CivetServer* Server, struct mg_connection* Connection) {
-  if (!Service->IsAuthenticated(Connection)) {
-    mg_send_http_error(Connection, 401, "Token invalid.");
-    return true;
+void AuthHandler::HandleGet(const httplib::Request& Req, httplib::Response& Res) {
+  if (!Service->IsAuthenticated(&Req)) {
+    SendError(Res, 401, "Token invalid.");
+    return;
   }
 
   nlohmann::json json;
-  RespondJson(Connection, json);
-
-  return true;
+  RespondJson(Res, json);
 }
 
-bool AuthHandler::handlePost(CivetServer* Server, struct mg_connection* Connection) {
+void AuthHandler::HandlePost(const httplib::Request& Req, httplib::Response& Res) {
   nlohmann::json json;
-  if (!ReadJson(Server, Connection, json) ||
+  if (!ReadJson(Req, json) ||
       !json.contains("username") ||
       !json.contains("password")) {
-    mg_send_http_error(Connection, 400, "Malformed body.");
-    return true;
+    SendError(Res, 400, "Malformed body.");
+    return;
   }
 
   std::string Username = json["username"];
@@ -60,11 +63,9 @@ bool AuthHandler::handlePost(CivetServer* Server, struct mg_connection* Connecti
 
     LogS("WebUI", "User has logged in to webui.");
 
-    RespondJson(Connection, json);
+    RespondJson(Res, json);
   } else {
-    mg_send_http_error(Connection, 401, "Token login.");
-    return true;
+    SendError(Res, 401, "Token login.");
+    return;
   }
-
-  return true;
 }

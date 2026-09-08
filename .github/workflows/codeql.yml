@@ -109,32 +109,19 @@ jobs:
       # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
       - name: Run manual C/C++ build steps
         if: matrix.language == 'c-cpp' && matrix.build-mode == 'manual'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build libssl-dev zlib1g-dev libsqlite3-dev pkg-config
-          sudo apt-get install -y uuid-dev || sudo apt-get install -y libuuid-dev
-
-          cd "${{ github.workspace }}/Tools"
-          # Build with the same Ninja flow as CI/release.
-          GENERATOR=Ninja "${{ github.workspace }}/Tools/generate_make_release.sh"
-
-      - name: Setup .NET SDK for C#
-        if: matrix.language == 'csharp' && matrix.build-mode == 'manual'
-        uses: actions/setup-dotnet@v6
+        uses: ./.github/actions/build
         with:
-          dotnet-version: "10.0.x"
+          preset: linux-release
+          component: Native
+          test: 'false'
 
       - name: Run manual C# build steps
         if: matrix.language == 'csharp' && matrix.build-mode == 'manual'
-        shell: pwsh
-        run: |
-          dotnet --info
-          dotnet restore Source/Loader/Loader.csproj -p:Configuration=Release
-          dotnet restore Source/Loader/Tests/Loader.Tests.csproj -p:Configuration=Release
-          dotnet build Source/Loader/Loader.csproj --configuration Release --no-restore
-          dotnet build Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-restore
+        uses: ./.github/actions/build
+        with:
+          preset: windows-release
+          component: Managed
+          test: 'false'
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
