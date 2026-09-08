@@ -50,13 +50,13 @@ jobs:
             loader_avalonia_runtime: linux-x64
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Cache build artifacts
         if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: |
             **/intermediate
@@ -275,7 +275,7 @@ jobs:
             tag: rekindled-ds2s-server:latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -307,7 +307,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download windows artifact
         id: download-windows-artifact
