@@ -1,5 +1,5 @@
 # build stage based on ubuntu LTS
-FROM ubuntu@sha256:84e77dee7d1bc93fb029a45e3c6cb9d8aa4831ccfcc7103d36e876938d28895b AS build
+FROM ubuntu@sha256:3131b4cc82a783df6c9df078f86e01819a13594b865c2cad47bd1bca2b7063bb AS build
 
 # install build dependencies without recommendations and clean apt cache in same layer
 RUN apt-get update && \
@@ -40,7 +40,7 @@ FROM steamcmd/steamcmd:latest@sha256:0e3dd116a002dfe756581e35ccf84591fc8b2bbd126
 RUN steamcmd +login anonymous +quit
 
 # runtime stage – also based on ubuntu LTS; allow STEAM_APP_ID to be overridden
-FROM ubuntu@sha256:84e77dee7d1bc93fb029a45e3c6cb9d8aa4831ccfcc7103d36e876938d28895b AS runtime
+FROM ubuntu@sha256:3131b4cc82a783df6c9df078f86e01819a13594b865c2cad47bd1bca2b7063bb AS runtime
 
 # default Steam AppID can be overridden with --build-arg STEAM_APP_ID=xxxx
 ARG STEAM_APP_ID=374320
