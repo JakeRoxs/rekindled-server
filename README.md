@@ -1,4 +1,4 @@
-![Dark Souls 3 - Open Server](./Resources/banner.png?raw=true)
+![Rekindled Server](./Resources/banner.png?raw=true)
 
 ![GitHub license](https://img.shields.io/github/license/jakeroxs/rekindled-server)
 ![GitHub release](https://img.shields.io/github/release/jakeroxs/rekindled-server)
@@ -124,13 +124,20 @@ If you want a quick one-liner to run the server, you can use this. Note that it 
 
 ### Docker Compose example
 
-A `docker-compose.yml` file is included in the repository root with a simple configuration for running both the game server and (optionally) the master server. To launch the services, run:
+A `docker-compose.yml` file is included in the repository root with a simple configuration for running both the game server and (optionally) the hub server. To launch the services, run:
 
 ```bash
 docker compose up -d
 ```
 
 The compose file uses the published images and binds the `Saved` directory to `./Saved` on the host. Adjust ports or enable the hub service if you want to host your own hub server/site.
+
+## Hub Server
+
+The hub (formerly the "master server") is a lightweight NodeJS service that game servers register with so the loader can discover them. Servers advertise themselves to a hub, and the loader queries a hub to build its server list.
+
+- **Public hub:** By default the loader connects to the public hub at `rekindled.jakesws.xyz` (port `50020`). You can override this in the loader settings if you'd rather use a private or local hub.
+- **Host your own:** Uncomment the `rekindled-hub` service in `docker-compose.yml` (or run `nix run github:jakeroxs/rekindled-server#hub`) to run your own hub, then point your servers/loaders at it.
 
 ## I launch the game but its unable to connect?
 
@@ -207,6 +214,33 @@ You can override explicitly:
 ```powershell
 pwsh .\Tools\build-cmake.ps1 -Generator "Ninja" -BuildType Debug
 pwsh .\Tools\build-cmake.ps1 -Generator "Visual Studio 18 2026" -BuildType Release
+```
+
+## Canonical package output paths
+
+Release packaging uses script-first entrypoints as the source of truth:
+
+- `Tools/generate_package_windows.bat`
+- `Tools/generate_package_linux.sh`
+
+Managed publish outputs are centralized to canonical paths owned by project configuration:
+
+- `intermediate/publish/canonical/Loader`
+- `intermediate/publish/canonical/Loader.Avalonia`
+
+The package scripts publish into these canonical locations and then assemble
+`rekindled-server/` from those outputs.
+
+Local package generation examples:
+
+```powershell
+# Windows
+./Tools/generate_package_windows.bat
+```
+
+```bash
+# Linux
+./Tools/generate_package_linux.sh
 ```
 
 ## Using nix (currently disabled until I figure out how to deal with dependencies in nix actions) 

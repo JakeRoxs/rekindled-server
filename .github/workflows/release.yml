@@ -29,8 +29,11 @@ jobs:
     permissions:
       contents: read
     env:
+      # Project paths are used for restore/build/test; package output paths are controlled inside package scripts.
       LOADER_PROJECT_PATH: Source/Loader/Loader.csproj
       LOADER_TESTS_PROJECT_PATH: Source/Loader/Tests/Loader.Tests.csproj
+      LOADER_AVALONIA_PROJECT_PATH: Source/Loader.Avalonia/Loader.Avalonia.csproj
+      LOADER_AVALONIA_TESTS_PROJECT_PATH: Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj
     strategy:
       fail-fast: false
       matrix:
@@ -39,10 +42,12 @@ jobs:
             os: windows-latest
             generator: Ninja
             platform: windows
+            loader_avalonia_runtime: win-x64
           - name: linux-ninja
             os: ubuntu-latest
             generator: Ninja
             platform: linux
+            loader_avalonia_runtime: linux-x64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -120,27 +125,47 @@ jobs:
 
       - name: Add MSBuild to PATH
         if: matrix.name == 'windows-ninja'
-        uses: microsoft/setup-msbuild@v3
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
 
       - name: Restore Loader NuGet packages
         if: matrix.name == 'windows-ninja'
-        run: dotnet restore ${{ env.LOADER_PROJECT_PATH }} -p:Configuration=Release
+        run: dotnet restore ${{ env.LOADER_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64
 
       - name: Restore Loader tests NuGet packages
         if: matrix.name == 'windows-ninja'
-        run: dotnet restore ${{ env.LOADER_TESTS_PROJECT_PATH }} -p:Configuration=Release
+        run: dotnet restore ${{ env.LOADER_TESTS_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64
 
       - name: Build Loader project
         if: matrix.name == 'windows-ninja'
-        run: dotnet build ${{ env.LOADER_PROJECT_PATH }} --configuration Release --no-restore
+        run: dotnet build ${{ env.LOADER_PROJECT_PATH }} --configuration Release --no-restore -p:Platform=x64
 
       - name: Build Loader tests project
         if: matrix.name == 'windows-ninja'
-        run: dotnet build ${{ env.LOADER_TESTS_PROJECT_PATH }} --configuration Release --no-restore
+        run: dotnet build ${{ env.LOADER_TESTS_PROJECT_PATH }} --configuration Release --no-restore -p:Platform=x64
 
       - name: Run Loader tests
         if: matrix.name == 'windows-ninja'
-        run: dotnet test ${{ env.LOADER_TESTS_PROJECT_PATH }} --configuration Release --verbosity normal
+        run: dotnet test ${{ env.LOADER_TESTS_PROJECT_PATH }} --configuration Release --verbosity normal -p:Platform=x64
+
+      - name: Restore Loader.Avalonia NuGet packages
+        if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
+        run: dotnet restore ${{ env.LOADER_AVALONIA_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64
+
+      - name: Build Loader.Avalonia project
+        if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
+        run: dotnet build ${{ env.LOADER_AVALONIA_PROJECT_PATH }} --configuration Release --no-restore -p:Platform=x64
+
+      - name: Restore Loader.Avalonia tests NuGet packages
+        if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
+        run: dotnet restore ${{ env.LOADER_AVALONIA_TESTS_PROJECT_PATH }} -p:Configuration=Release -p:Platform=x64
+
+      - name: Build Loader.Avalonia tests project
+        if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
+        run: dotnet build ${{ env.LOADER_AVALONIA_TESTS_PROJECT_PATH }} --configuration Release --no-restore -p:Platform=x64
+
+      - name: Run Loader.Avalonia tests
+        if: matrix.name == 'windows-ninja' || matrix.name == 'linux-ninja'
+        run: dotnet test ${{ env.LOADER_AVALONIA_TESTS_PROJECT_PATH }} --configuration Release --no-build --no-restore --verbosity normal -p:Platform=x64
 
       - name: Build on Windows (Ninja)
         if: matrix.name == 'windows-ninja'
@@ -193,6 +218,10 @@ jobs:
       - name: Package Release (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
+        env:
+          PACKAGE_BUILD_CONFIGURATION: Release
+          PACKAGE_PLATFORM: x64
+          LOADER_WINDOWS_RUNTIME: win-x64
         run: |
           cd "${{ github.workspace }}"
           ./Tools/generate_package_windows.bat
@@ -200,12 +229,23 @@ jobs:
       - name: Package Release (Linux)
         if: matrix.platform == 'linux'
         shell: bash
+        env:
+          PACKAGE_BUILD_CONFIGURATION: Release
+          PACKAGE_PLATFORM: x64
+          LOADER_AVALONIA_LINUX_RUNTIME: linux-x64
         run: |
           cd "${{ github.workspace }}"
           "${{ github.workspace }}/Tools/generate_package_linux.sh"
 
+      - name: Verify packaged files
+        shell: bash
+        run: |
+          echo "Packaged contents for ${GITHUB_RUN_ID} on ${{ matrix.platform }}"
+          cd "${{ github.workspace }}/rekindled-server"
+          find . | sort
+
       - name: Zip Release
-        uses: vimtor/action-zip@v1
+        uses: vimtor/action-zip@5f1c4aa587ea41db1110df6a99981dbe19cee310 # v1
         with:
           files: rekindled-server/
           dest: ${{ matrix.platform }}-${{ env.VERSION_NUMBER }}${{ env.VERSION_NUMBER_POSTFIX }}.zip
@@ -240,16 +280,16 @@ jobs:
           submodules: recursive
 
       - name: Login to DockerHub
-        uses: docker/login-action@v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Build and push ${{ matrix.image.tag }}
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7
         with:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.file }}

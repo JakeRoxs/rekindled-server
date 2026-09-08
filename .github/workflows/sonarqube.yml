@@ -74,6 +74,7 @@ jobs:
           dotnet restore Source/Loader/Loader.csproj -p:Configuration=Release -p:EnableWindowsTargeting=true
           dotnet restore Source/Loader/Tests/Loader.Tests.csproj -p:Configuration=Release -p:EnableWindowsTargeting=true
           dotnet restore Source/Loader.Avalonia/Loader.Avalonia.csproj -p:Configuration=Release
+          dotnet restore Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj -p:Configuration=Release
 
       - name: Install SonarScanner for .NET
         if: steps.cache-sonarscanner-tool.outputs.cache-hit != 'true'
@@ -87,32 +88,38 @@ jobs:
         id: scan_loader
         continue-on-error: true
         run: |
+          mkdir -p "$GITHUB_WORKSPACE/TestResults/Loader"
           dotnet sonarscanner begin \
             /k:"Rekindled-Server-Loader" \
             /n:"rekindled-server-loader" \
             /d:sonar.host.url="$SONAR_HOST_URL" \
             /d:sonar.login="$SONAR_TOKEN" \
+            /d:sonar.cs.opencover.reportsPaths="$GITHUB_WORKSPACE/TestResults/Loader/coverage.opencover.xml" \
             /d:sonar.exclusions="Source/Loader.Avalonia/**,Source/ThirdParty/**,Protobuf/**,build/**,Resources/**,Tools/**,*.dockerfile" \
             /d:sonar.sourceEncoding="UTF-8" \
             /d:sonar.qualitygate.wait="true"
           dotnet build Source/Loader/Loader.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
           dotnet build Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-restore -p:EnableWindowsTargeting=true
-          dotnet test Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-build --no-restore -p:EnableWindowsTargeting=true
+          dotnet test Source/Loader/Tests/Loader.Tests.csproj --configuration Release --no-build --no-restore -p:EnableWindowsTargeting=true /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="$GITHUB_WORKSPACE/TestResults/Loader/coverage."
           dotnet sonarscanner end /d:sonar.login="$SONAR_TOKEN"
 
       - name: Run SonarScanner (Loader Avalonia C#)
         id: scan_loader_avalonia
         continue-on-error: true
         run: |
+          mkdir -p "$GITHUB_WORKSPACE/TestResults/Loader.Avalonia"
           dotnet sonarscanner begin \
             /k:"Rekindled-Server-Loader-Avalonia" \
             /n:"rekindled-server-loader-avalonia" \
             /d:sonar.host.url="$SONAR_HOST_URL" \
             /d:sonar.login="$SONAR_TOKEN" \
+            /d:sonar.cs.opencover.reportsPaths="$GITHUB_WORKSPACE/TestResults/Loader.Avalonia/coverage.opencover.xml" \
             /d:sonar.exclusions="Source/Loader/**,Source/ThirdParty/**,Protobuf/**,build/**,Resources/**,Tools/**,*.dockerfile" \
             /d:sonar.sourceEncoding="UTF-8" \
             /d:sonar.qualitygate.wait="true"
           dotnet build Source/Loader.Avalonia/Loader.Avalonia.csproj --configuration Release --no-restore
+          dotnet build Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-restore
+          dotnet test Source/Loader.Avalonia/Tests/Loader.Avalonia.Tests.csproj --configuration Release --no-build --no-restore /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput="$GITHUB_WORKSPACE/TestResults/Loader.Avalonia/coverage."
           dotnet sonarscanner end /d:sonar.login="$SONAR_TOKEN"
 
       - name: Fail job if any Loader Sonar scan failed
@@ -143,7 +150,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build build-essential pkg-config libsqlite3-dev libssl-dev uuid-dev
+          sudo apt-get install -y cmake ninja-build build-essential pkg-config libsqlite3-dev libssl-dev uuid-dev gcovr
 
       - name: Cache SonarQube scanner plugins
         uses: actions/cache@v6
@@ -153,7 +160,16 @@ jobs:
           restore-keys: sonar-plugin-cache-${{ runner.os }}-
 
       - name: Configure CMake (generates compile_commands.json)
-        run: cmake -B build -G Ninja -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_FLAGS="--coverage -O0 -g" -DCMAKE_CXX_FLAGS="--coverage -O0 -g"
+
+      - name: Build C++ targets with coverage instrumentation
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Run C++ tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Generate C++ Cobertura coverage report (sonar-cxx)
+        run: gcovr --root . --xml --output build/cpp-cobertura.xml --exclude 'Source/ThirdParty/.*' --exclude 'build/.*'
 
       - uses: SonarSource/sonarqube-scan-action@v8
         with:
@@ -163,6 +179,7 @@ jobs:
             -Dsonar.sources=.
             -Dsonar.exclusions=Source/ThirdParty/**,Protobuf/**,build/**,Source/Loader/**,Resources/**
             -Dsonar.cfamily.compile-commands=build/compile_commands.json
+            -Dsonar.cxx.cobertura.reportPaths=build/cpp-cobertura.xml
             -Dsonar.cfamily.threads=4
             -Dsonar.sourceEncoding=UTF-8
             -Dsonar.verbose=true
