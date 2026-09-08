@@ -194,7 +194,7 @@ struct StubConnection : public NetConnection {
 
   bool Listen(int) override { return false; }
   std::shared_ptr<NetConnection> Accept() override { return nullptr; }
-  bool Connect(std::string, int, bool) override { return false; }
+  bool Connect(const std::string&, int, bool) override { return false; }
   bool Pump() override { return false; }
   bool Peek(std::vector<uint8_t>&, int, int, int&) override { return false; }
   bool Receive(std::vector<uint8_t>&, int, int, int&) override { return false; }

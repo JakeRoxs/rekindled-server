@@ -117,7 +117,7 @@ NetIPAddress NetConnectionUDP::GetAddress() {
   return IPAddress;
 }
 
-bool NetConnectionUDP::Connect(std::string Hostname, int Port, bool ForceLastIpEntry) {
+bool NetConnectionUDP::Connect(const std::string& Hostname, int Port, bool ForceLastIpEntry) {
   if (Socket != INVALID_SOCKET_VALUE) {
     return false;
   }
