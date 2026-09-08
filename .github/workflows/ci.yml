@@ -53,8 +53,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            preset: windows-release
+          # Keep the hosted Visual Studio version aligned with the CMake preset.
+          - os: windows-2025-vs2026
+            preset: windows-vs2026-release
           - os: ubuntu-latest
             preset: linux-release
     steps:
