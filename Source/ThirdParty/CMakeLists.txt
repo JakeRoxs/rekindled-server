@@ -11,8 +11,8 @@ add_subdirectory(zlib)
 
 # Deprecated vendor-style options remain for compatibility, but are no-op.
 set(REKINDLED_CIVETWEB_SOURCE_DIR "" CACHE PATH "Path to a local civetweb source tree to use instead of downloading it")
-set(REKINDLED_CIVETWEB_ARCHIVE "" CACHE STRING "URL to a CivetWeb source archive to fetch when local source is unavailable (empty means use git main branch)")
-set(REKINDLED_CIVETWEB_ARCHIVE_HASH "" CACHE STRING "Expected SHA256 of the CivetWeb archive (optional but strongly recommended when REKINDLED_CIVETWEB_ARCHIVE is set; leave empty to skip hash verification)")
+set(REKINDLED_CIVETWEB_ARCHIVE "https://github.com/civetweb/civetweb/archive/3309a6cac05335aa4371a0c3750b42fbe05d3cb4.tar.gz" CACHE STRING "URL to a CivetWeb source archive to fetch when local source is unavailable (empty means use git main branch)")
+set(REKINDLED_CIVETWEB_ARCHIVE_HASH "SHA256=B99AD9A02783AE92F6CD17A335FBD07547AC80D195876D348FE1C14D4E12533E" CACHE STRING "Expected SHA256 of the CivetWeb archive (optional but strongly recommended when REKINDLED_CIVETWEB_ARCHIVE is set; leave empty to skip hash verification)")
 option(REKINDLED_CIVETWEB_ALLOW_REMOTE_FETCH "Allow automatically fetching CivetWeb via network when local source is unavailable" ON)
 set(REKINDLED_CIVETWEB_GIT_REPOSITORY "https://github.com/civetweb/civetweb.git" CACHE STRING "CivetWeb git repository to fetch if archive-based fetch is disabled")
 set(REKINDLED_CIVETWEB_GIT_TAG "3309a6cac05335aa4371a0c3750b42fbe05d3cb4" CACHE STRING "CivetWeb commit to checkout (pinned: upstream master is broken as of 2026-04-19 commit 588860e3)")
