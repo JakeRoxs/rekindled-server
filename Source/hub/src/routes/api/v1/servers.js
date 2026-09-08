@@ -365,7 +365,8 @@ const crypto = require("node:crypto");
 
 function requireWriteAuth(req, res) {
   if (!MASTER_SERVER_WRITE_SECRET) {
-    return sendError(res, 500, "Server write secret not configured");
+    sendError(res, 500, "Server write secret not configured");
+    return res;
   }
 
   const providedSecret = String(
@@ -382,7 +383,8 @@ function requireWriteAuth(req, res) {
   secretB.copy(paddedB);
 
   if (!crypto.timingSafeEqual(paddedA, paddedB)) {
-    return sendError(res, 401, "Unauthorized");
+    sendError(res, 401, "Unauthorized");
+    return res;
   }
 
   return null;
@@ -770,3 +772,21 @@ module.exports.getStatus = getStatus;
 module.exports.validatePublicKey = validatePublicKey;
 module.exports.normalizeServerId = normalizeServerId;
 module.exports.requireWriteAuth = requireWriteAuth;
+// Exported for testing.
+module.exports.addServer = addServer;
+module.exports.removeServer = removeServer;
+module.exports.buildServerObject = buildServerObject;
+module.exports.isServerFilter = isServerFilter;
+module.exports.isServerCensored = isServerCensored;
+module.exports.isServerAllowedToShard = isServerAllowedToShard;
+module.exports.sanitizeField = sanitizeField;
+module.exports.validateWebAddress = validateWebAddress;
+module.exports.normalizePort = normalizePort;
+module.exports.normalizeGameType = normalizeGameType;
+module.exports.removeTimedOutServers = removeTimedOutServers;
+module.exports.getServerIdFromRequest = getServerIdFromRequest;
+module.exports.getPortFromRequest = getPortFromRequest;
+module.exports.activeServers = activeServers;
+module.exports.filters = filters;
+module.exports.censors = censors;
+module.exports.shardingAllowList = shardingAllowList;

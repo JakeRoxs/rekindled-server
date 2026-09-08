@@ -257,7 +257,7 @@ jobs:
       - name: Run hub tests with coverage
         shell: bash
         working-directory: Source/hub
-        run: npx c8 --reporter=lcov --reports-dir ../../TestResults/hub node --test ./src/test/servers.test.js
+        run: npx c8 --reporter=lcov --reports-dir ../../TestResults/hub node --test
 
       - uses: SonarSource/sonarqube-scan-action@v8
         with:
