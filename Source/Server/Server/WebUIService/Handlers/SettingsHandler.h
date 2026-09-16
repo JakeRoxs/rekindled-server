@@ -24,10 +24,10 @@ class SettingsHandler : public WebUIHandler {
 public:
   SettingsHandler(WebUIService* InService);
 
-  virtual bool handleGet(CivetServer* Server, struct mg_connection* Connection) override;
-  virtual bool handlePost(CivetServer* Server, struct mg_connection* Connection) override;
+  void HandleGet(const httplib::Request& Req, httplib::Response& Res);
+  void HandlePost(const httplib::Request& Req, httplib::Response& Res);
 
-  virtual void Register(CivetServer* Server) override;
+  virtual void Register(httplib::Server* Server) override;
 
 protected:
   bool IsWeaponLevelMatchingDisabled();

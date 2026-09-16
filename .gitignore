@@ -69,6 +69,9 @@ enc_temp_folder/
 Publish/
 rekindled-server/
 node_modules/
+# JS test coverage artifacts (c8/nyc)
+coverage/
+.nyc_output/
 Tools/Utilities/ScyllaHide/
 Tools/Utilities/ServerAddressFinder/
 Tools/Deploy/
@@ -85,8 +88,10 @@ rekindled.code-workspace
 *.vscode*
 /build*
 /compile_commands.json
+/CMakeUserPresets.json
 /out/build/x64-Debug
 */obj/
+**/TestResults/
 sonar-project.properties
 .ipynb_checkpoints/
 
@@ -98,4 +103,3 @@ copilot-instructions.md
 /.github/skills
 /todos
 /docs
-

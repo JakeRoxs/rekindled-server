@@ -21,8 +21,10 @@ StatisticsHandler::StatisticsHandler(WebUIService* InService)
     : WebUIHandler(InService) {
 }
 
-void StatisticsHandler::Register(CivetServer* Server) {
-  Server->addHandler("/statistics", this);
+void StatisticsHandler::Register(httplib::Server* Server) {
+  Server->Get("/statistics", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandleGet(Req, Res);
+  });
 }
 
 void StatisticsHandler::GatherData() {
@@ -76,10 +78,10 @@ void StatisticsHandler::GatherData() {
   }
 }
 
-bool StatisticsHandler::handleGet(CivetServer* Server, struct mg_connection* Connection) {
-  if (!Service->IsAuthenticated(Connection)) {
-    mg_send_http_error(Connection, 401, "Token invalid.");
-    return true;
+void StatisticsHandler::HandleGet(const httplib::Request& Req, httplib::Response& Res) {
+  if (!Service->IsAuthenticated(&Req)) {
+    SendError(Res, 401, "Token invalid.");
+    return;
   }
 
   nlohmann::json json;
@@ -115,9 +117,7 @@ bool StatisticsHandler::handleGet(CivetServer* Server, struct mg_connection* Con
     json["statistics"] = statistics;
   }
 
-  RespondJson(Connection, json);
+  RespondJson(Res, json);
 
   MarkAsNeedsDataGather();
-
-  return true;
 }

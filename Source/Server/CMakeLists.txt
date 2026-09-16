@@ -170,56 +170,51 @@ target_link_libraries(
     DarkSouls3
     DarkSouls2
     Shared
-    civetweb
+    httplib
     libprotobuf-lite
     ${REKINDLED_SQLITE_TARGET}
     steam
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE $<TARGET_PROPERTY:civetweb,INTERFACE_INCLUDE_DIRECTORIES>)
+target_include_directories(${PROJECT_NAME} PRIVATE $<TARGET_PROPERTY:httplib,INTERFACE_INCLUDE_DIRECTORIES>)
 
-# Copy some important files over to our output directory.
-foreach(config ${CMAKE_CONFIGURATION_TYPES})
-    string(TOUPPER ${config} config_upper)
-    
-    # Write steam appid file, required for dedicated servers.
-    # Server writes this out automatically now.
-    #file(WRITE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_${config_upper}}/steam_appid.txt" "374320")
-
-    # Copy WebUI resources to output folder (if output path is configured).
-    set("dst_dir" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_${config_upper}}")
-    if(NOT dst_dir)
-        # If runtime directory is not set yet, fall back to binary dir.
-        set(dst_dir "${CMAKE_BINARY_DIR}")
-    endif()
-
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../WebUI")
-        file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../WebUI" DESTINATION "${dst_dir}")
-    else()
-        message(WARNING "WebUI folder not found, skipping copy: ${CMAKE_CURRENT_SOURCE_DIR}/../WebUI")
-    endif()
-endforeach()
+# Refresh runtime assets on incremental builds, even when no C++ files changed.
+add_custom_target(ServerRuntimeAssets
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "$<TARGET_FILE:steam>" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/../WebUI" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/WebUI"
+    VERBATIM
+)
+add_dependencies(Server ServerRuntimeAssets)
+install(TARGETS Server RUNTIME DESTINATION bin COMPONENT Runtime)
+install(FILES "$<TARGET_FILE:steam>" DESTINATION lib COMPONENT Runtime)
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../WebUI"
+    DESTINATION share/rekindled-server COMPONENT Runtime)
 
 #-----------------------------------------------------------------------------#
 # Client emulator config unit tests
 #-----------------------------------------------------------------------------#
-add_executable(ServerClientConfigTests
-    Client/Tests/ClientConfigTests.cpp
-)
+if(BUILD_TESTING)
+    add_executable(ServerClientConfigTests
+        Client/Tests/ClientConfigTests.cpp
+    )
 
-target_include_directories(ServerClientConfigTests PUBLIC
-    "${CMAKE_CURRENT_SOURCE_DIR}"
-)
+    target_include_directories(ServerClientConfigTests PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
 
-if(TARGET ServerClientConfigTests)
-    target_include_directories(ServerClientConfigTests PRIVATE $<TARGET_PROPERTY:civetweb,INTERFACE_INCLUDE_DIRECTORIES>)
+    if(TARGET ServerClientConfigTests)
+        target_include_directories(ServerClientConfigTests PRIVATE $<TARGET_PROPERTY:httplib,INTERFACE_INCLUDE_DIRECTORIES>)
+    endif()
+
+    target_link_libraries(ServerClientConfigTests PRIVATE
+        Shared
+        steam
+        libprotobuf-lite
+    )
+
+    add_test(NAME ServerClientConfigTests COMMAND ServerClientConfigTests)
+
 endif()
-
-target_link_libraries(ServerClientConfigTests PRIVATE
-    Shared
-    steam
-    libprotobuf-lite
-)
-
-add_test(NAME ServerClientConfigTests COMMAND ServerClientConfigTests)
-

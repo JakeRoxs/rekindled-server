@@ -65,7 +65,7 @@ public:
 
   virtual bool Pump() override;
 
-  virtual bool Connect(std::string Hostname, int Port, bool ForceLastIpEntry) override;
+  virtual bool Connect(const std::string& Hostname, int Port, bool ForceLastIpEntry) override;
 
   virtual bool Peek(std::vector<uint8_t>& Buffer, int Offset, int Count, int& BytesReceived) override;
   virtual bool Receive(std::vector<uint8_t>& Buffer, int Offset, int Count, int& BytesReceived) override;
