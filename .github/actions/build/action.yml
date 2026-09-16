@@ -12,7 +12,7 @@ inputs:
     default: All
   test:
     description: Run native and managed tests after building
-    default: 'true'
+    default: "true"
 runs:
   using: composite
   steps:
@@ -20,7 +20,7 @@ runs:
       if: inputs.component != 'Native'
       uses: actions/setup-dotnet@v6
       with:
-        dotnet-version: '10.0.x'
+        dotnet-version: "10.0.x"
 
     - name: Cache NuGet packages
       if: inputs.component != 'Native'
@@ -48,9 +48,7 @@ runs:
 
     - name: Bootstrap vcpkg
       if: runner.os == 'Windows'
-      uses: lukka/get-vcpkg@v1.4.1
-      with:
-        vcpkgGitTag: '2024.04.26'
+      uses: lukka/run-vcpkg@v11
 
     - name: Install vcpkg dependencies
       if: runner.os == 'Windows'

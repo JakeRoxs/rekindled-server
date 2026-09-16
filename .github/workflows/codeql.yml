@@ -81,6 +81,56 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Compute a stable cache key from source + build-system files (including this workflow).
+      # Reused by all cache steps so the hash is computed once per job.
+      - name: Compute cache key
+        id: cachekey
+        run: |
+          echo "SOURCE_HASH=${{ hashFiles('Source/**','Protobuf/**','CMakePresets.json','CMakeLists.txt','**/CMakeLists.txt','**/*.sln','**/*.csproj','vcpkg.json','vcpkg-toolchain.cmake','Tools/**','.github/actions/**','.github/workflows/codeql.yml') }}" >> $GITHUB_OUTPUT
+
+      # Restore CodeQL database + trap caches. They are saved by the
+      # "Save CodeQL database cache" step after the analyze step.
+      - name: Restore CodeQL database cache
+        if: matrix.build-mode == 'manual'
+        uses: actions/cache@v6
+        with:
+          path: |
+            ${{ runner.temp }}/codeql_databases
+            ${{ runner.temp }}/trapCaches
+          key: codeql-db-${{ runner.os }}-${{ matrix.language }}-${{ steps.cachekey.outputs.SOURCE_HASH }}
+          restore-keys: |
+            codeql-db-${{ runner.os }}-${{ matrix.language }}-
+
+      # Restore the CMake build directory so the manual build is incremental.
+      - name: Restore C/C++ build directory cache
+        if: matrix.language == 'c-cpp'
+        uses: actions/cache@v6
+        with:
+          path: intermediate/cmake/linux-release
+          key: codeql-build-Linux-c-cpp-${{ steps.cachekey.outputs.SOURCE_HASH }}
+          restore-keys: |
+            codeql-build-Linux-c-cpp-
+
+      - name: Clean stale CMake cache (C/C++ build dir)
+        if: matrix.language == 'c-cpp'
+        shell: bash
+        run: |
+          rm -f intermediate/cmake/linux-release/CMakeCache.txt
+          rm -rf intermediate/cmake/linux-release/CMakeFiles
+
+      # The C# job uses `dotnet build` (bin/obj next to each project), not the
+      # CMake preset binary dir, so cache those instead.
+      - name: Restore C# build directory cache
+        if: matrix.language == 'csharp'
+        uses: actions/cache@v6
+        with:
+          path: |
+            Source/**/bin
+            Source/**/obj
+          key: codeql-build-Windows-csharp-${{ steps.cachekey.outputs.SOURCE_HASH }}
+          restore-keys: |
+            codeql-build-Windows-csharp-
+
       # Add any setup steps before running the `github/codeql-action/init` action.
       # This includes steps like installing compilers or runtimes (`actions/setup-node`
       # or others). This is typically only required for manual builds.
@@ -113,7 +163,7 @@ jobs:
         with:
           preset: linux-release
           component: Native
-          test: 'false'
+          test: "false"
 
       - name: Run manual C# build steps
         if: matrix.language == 'csharp' && matrix.build-mode == 'manual'
@@ -121,9 +171,39 @@ jobs:
         with:
           preset: windows-release
           component: Managed
-          test: 'false'
+          test: "false"
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{matrix.language}}"
+
+      # Save the CodeQL database + trap caches now that analyze has created them.
+      # continue-on-error: a key collision from a concurrent run must not fail the scan.
+      - name: Save CodeQL database cache
+        if: matrix.build-mode == 'manual'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ runner.temp }}/codeql_databases
+            ${{ runner.temp }}/trapCaches
+          key: codeql-db-${{ runner.os }}-${{ matrix.language }}-${{ steps.cachekey.outputs.SOURCE_HASH }}
+
+      - name: Save C/C++ build directory cache
+        if: matrix.language == 'c-cpp'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: intermediate/cmake/linux-release
+          key: codeql-build-Linux-c-cpp-${{ steps.cachekey.outputs.SOURCE_HASH }}
+
+      - name: Save C# build directory cache
+        if: matrix.language == 'csharp'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            Source/**/bin
+            Source/**/obj
+          key: codeql-build-Windows-csharp-${{ steps.cachekey.outputs.SOURCE_HASH }}
