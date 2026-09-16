@@ -38,6 +38,26 @@ runs:
         sudo apt-get update
         sudo apt-get install -y build-essential cmake ninja-build libssl-dev zlib1g-dev libsqlite3-dev pkg-config uuid-dev
 
+    - name: Cache vcpkg binary cache
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/vcpkg/archives
+        key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
+        restore-keys: |
+          ${{ runner.os }}-vcpkg-
+
+    - name: Bootstrap vcpkg
+      if: runner.os == 'Windows'
+      uses: lukka/get-vcpkg@v1.4.1
+      with:
+        vcpkgGitTag: '2024.04.26'
+
+    - name: Install vcpkg dependencies
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        & "$env:VCPKG_ROOT/vcpkg.exe" install
+
     - name: Build and test
       shell: pwsh
       env:

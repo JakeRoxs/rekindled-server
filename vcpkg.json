@@ -1,0 +1,13 @@
+{
+  "name": "rekindled-server",
+  "version": "0.0.1",
+  "description": "vcpkg manifest for the Rekindled Server native build. Declares the third-party libraries the build resolves through vcpkg so that dependency provenance is reproducible across dev machines and CI. Resolved versions are pinned in CI via the vcpkg git tag; the version constraints here guard against resolving a legacy/vulnerable OpenSSL.",
+  "dependencies": [
+    {
+      "name": "openssl",
+      "version>=": "3.0.0"
+    },
+    "zlib",
+    "sqlite3"
+  ]
+}

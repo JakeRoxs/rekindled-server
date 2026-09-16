@@ -114,19 +114,15 @@ target_link_libraries(
     aes_modes
     lib_generic_c
     zlib
-    libcurl
+    # cpp-httplib replaces libcurl as the outbound HTTP client (NetHttpRequest).
+    # It is header-only; its SSL support links the `openssl` target below.
+    httplib
     # OpenSSL target from ThirdParty/openssl (resolved by ThirdParty/CMakeLists)
     openssl
     # Shared exposes protobuf headers in its public interface, so consumers need transitive protobuf include support.
     libprotobuf-lite
     ${PLATFORM_LIBRARIES}
 )
-
-# Ensure OpenSSL external project is built before Shared, because openssl.conf is generated
-# and libcrypto/libssl are produced in the openssl install output.
-if(TARGET openssl_fetched_build)
-    add_dependencies(${PROJECT_NAME} openssl_fetched_build)
-endif()
 
 # Avoid direct legacy link names (crypto/ssl) in case target import names differ on MSVC.
 # ThirdParty creates the correct openssl interface target with proper OpenSSL::Crypto/OpenSSL::SSL mapping.

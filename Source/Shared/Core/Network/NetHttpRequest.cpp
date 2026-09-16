@@ -11,16 +11,35 @@
 #include "Shared/Core/Network/NetHttpRequest.h"
 #include "Shared/Core/Utils/Logging.h"
 
-#include <thread>
-#include <chrono>
-#include <cstring>
+// Outbound HTTPS requests (public IP lookup, Discord webhooks, master-server
+// calls) use cpp-httplib's SSL client. TLS support is enabled project-wide on
+// the `httplib` INTERFACE target (see ThirdParty/CMakeLists.txt).
+#include <httplib.h>
 
-using namespace std::chrono_literals;
+namespace {
+
+// Split "scheme://host:port/path" into the "scheme://host:port" base that the
+// httplib::Client constructor expects, and the "/path" handed to each request.
+bool SplitUrl(const std::string& Url, std::string& Base, std::string& Path) {
+  auto SchemeEnd = Url.find("://");
+  const size_t AfterScheme = (SchemeEnd == std::string::npos) ? 0 : SchemeEnd + 3;
+  const auto PathStart = Url.find('/', AfterScheme);
+
+  if (PathStart == std::string::npos) {
+    Base = Url;
+    Path = "/";
+  } else {
+    Base = Url.substr(0, PathStart);
+    Path = Url.substr(PathStart);
+  }
+  return true;
+}
+
+} // namespace
 
 NetHttpRequest::~NetHttpRequest() {
-  Response = nullptr;
-  if (Handle) {
-    FinishRequest();
+  if (AsyncThread.joinable()) {
+    AsyncThread.join();
   }
 }
 
@@ -48,121 +67,103 @@ void NetHttpRequest::SetBody(const std::string& InBody) {
   Body.assign((uint8_t*)InBody.data(), (uint8_t*)InBody.data() + InBody.size());
 }
 
-size_t NetHttpRequest::ReceiveBodyFunction(void* ptr, size_t size, size_t nmemb, NetHttpResponse* Response) {
-  size_t Offset = Response->Body.size();
-  Response->Body.resize(Response->Body.size() + nmemb);
-  memcpy(Response->Body.data() + Offset, ptr, nmemb);
+void NetHttpRequest::Execute() {
+  std::string Base;
+  std::string Path;
+  SplitUrl(Url, Base, Path);
 
-  return nmemb;
-}
+  httplib::Client Client(Base);
+  if (!Client.is_valid()) {
+    if (Response) {
+      Response->WasSuccess = false;
+    }
+    Done.store(true);
+    return;
+  }
 
-bool NetHttpRequest::StartRequest() {
-  Handle = curl_easy_init();
-  HandleMulti = curl_multi_init();
-  Response = std::make_shared<NetHttpResponse>();
+  // Verify the server certificate for outbound TLS connections to prevent
+  // man-in-the-middle tampering of master-server, webhook, and IP-lookup calls.
+  Client.enable_server_certificate_verification(true);
+  Client.set_connection_timeout(10);
+  Client.set_read_timeout(10);
 
-  struct curl_slist* Headers = NULL;
-  Headers = curl_slist_append(Headers, "Accept: application/json");
-  Headers = curl_slist_append(Headers, "Content-Type: application/json");
-  Headers = curl_slist_append(Headers, "charset: utf-8");
+  httplib::Headers Headers = {
+      {"Accept", "application/json"},
+      {"Content-Type", "application/json"},
+      {"charset", "utf-8"},
+  };
 
-  curl_easy_setopt(Handle, CURLOPT_URL, Url.c_str());
-  curl_easy_setopt(Handle, CURLOPT_WRITEFUNCTION, ReceiveBodyFunction);
-  curl_easy_setopt(Handle, CURLOPT_WRITEDATA, Response.get());
-  curl_easy_setopt(Handle, CURLOPT_HTTPHEADER, Headers);
-  curl_easy_setopt(Handle, CURLOPT_SSL_VERIFYPEER, false);
-  curl_easy_setopt(Handle, CURLOPT_SSL_VERIFYHOST, false);
+  // Materialize the request body string only for methods that send a payload;
+  // GET/HEAD/OPTIONS/TRACE/CONNECT never use it, so this avoids an unnecessary
+  // allocation + copy on every request.
+  std::string BodyStr;
+  if (Method == NetHttpMethod::POST ||
+      Method == NetHttpMethod::PUT ||
+      Method == NetHttpMethod::METHOD_DELETE) {
+    BodyStr.assign(Body.begin(), Body.end());
+  }
 
+  httplib::Result Result;
   switch (Method) {
-  case NetHttpMethod::OPTIONS:
-    curl_easy_setopt(Handle, CURLOPT_CUSTOMREQUEST, "OPTIONS");
-    break;
   case NetHttpMethod::GET:
-    curl_easy_setopt(Handle, CURLOPT_CUSTOMREQUEST, "GET");
+    Result = Client.Get(Path, Headers);
     break;
   case NetHttpMethod::HEAD:
-    curl_easy_setopt(Handle, CURLOPT_CUSTOMREQUEST, "HEAD");
+    Result = Client.Head(Path, Headers);
+    break;
+  case NetHttpMethod::OPTIONS:
+    Result = Client.Options(Path, Headers);
     break;
   case NetHttpMethod::POST:
-    curl_easy_setopt(Handle, CURLOPT_CUSTOMREQUEST, "POST");
+    Result = Client.Post(Path, Headers, BodyStr, "application/json");
     break;
   case NetHttpMethod::PUT:
-    curl_easy_setopt(Handle, CURLOPT_CUSTOMREQUEST, "PUT");
+    Result = Client.Put(Path, Headers, BodyStr, "application/json");
     break;
   case NetHttpMethod::METHOD_DELETE:
-    curl_easy_setopt(Handle, CURLOPT_CUSTOMREQUEST, "DELETE");
+    Result = Client.Delete(Path, Headers, BodyStr, "application/json");
     break;
   case NetHttpMethod::TRACE:
-    curl_easy_setopt(Handle, CURLOPT_CUSTOMREQUEST, "TRACE");
-    break;
   case NetHttpMethod::CONNECT:
-    curl_easy_setopt(Handle, CURLOPT_CUSTOMREQUEST, "CONNECT");
+    // Not used by the server; httplib has no TRACE/CONNECT client call.
     break;
   }
 
-  if (Body.size() > 0) {
-    curl_easy_setopt(Handle, CURLOPT_POSTFIELDS, Body.data());
-    curl_easy_setopt(Handle, CURLOPT_POSTFIELDSIZE, Body.size());
+  if (Response) {
+    Response->WasSuccess = (bool)Result;
+    if (Result) {
+      const auto& Resp = *Result;
+      Response->Body.assign(Resp.body.begin(), Resp.body.end());
+    }
   }
 
-  curl_multi_add_handle(HandleMulti, Handle);
-
-  return true;
-}
-
-void NetHttpRequest::PollRequest() {
-  bool Complete = false;
-
-  int ActiveHandles = 0;
-  CURLMcode Result = curl_multi_perform(HandleMulti, &ActiveHandles);
-  if (Result != CURLE_OK || ActiveHandles == 0) {
-    Complete = true;
-    Response->WasSuccess = (Result == CURLE_OK);
-  }
-
-  if (Complete) {
-    FinishRequest();
-  }
-}
-
-bool NetHttpRequest::FinishRequest() {
-  curl_multi_remove_handle(HandleMulti, Handle);
-
-  curl_easy_cleanup(Handle);
-  Handle = nullptr;
-
-  curl_multi_cleanup(HandleMulti);
-  HandleMulti = nullptr;
-
-  return true;
+  Done.store(true);
 }
 
 bool NetHttpRequest::Send() {
-  Ensure(!InProgress());
-
-  if (!StartRequest()) {
+  if (InProgress()) {
     return false;
   }
-  while (InProgress()) {
-    PollRequest();
-    std::this_thread::sleep_for(1ms);
-  }
+
+  Response = std::make_shared<NetHttpResponse>();
+  Started.store(true);
+  Execute();
   return true;
 }
 
 bool NetHttpRequest::SendAsync() {
-  Ensure(!InProgress());
-  if (!StartRequest()) {
+  if (InProgress()) {
     return false;
   }
+
+  Response = std::make_shared<NetHttpResponse>();
+  Started.store(true);
+  AsyncThread = std::thread([this]() { Execute(); });
   return true;
 }
 
 bool NetHttpRequest::InProgress() {
-  if (Handle) {
-    PollRequest();
-  }
-  return Handle != nullptr;
+  return Started.load() && !Done.load();
 }
 
 std::shared_ptr<NetHttpResponse> NetHttpRequest::GetResponse() {

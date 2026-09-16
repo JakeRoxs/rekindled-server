@@ -16,6 +16,7 @@
     , libuuid
     , sqlite
     , openssl
+    , zlib
 }:
 
 with builtins;
@@ -24,6 +25,8 @@ with lib;
 let
     # cpp-httplib: pre-fetch the source tree so the Nix build stays hermetic and
     # CMake's FetchContent consumes it via REKINDLED_HTTPLIB_SOURCE_DIR.
+    # OpenSSL and zlib are provided by nixpkgs (see buildInputs) and are
+    # discovered through CMake's find_package, so no archive fetches are needed.
     httplibArchive = builtins.fetchurl {
       url = "https://github.com/yhirose/cpp-httplib/archive/refs/tags/v0.54.1.tar.gz";
       sha256 = "omipkmjocqrygdletm4o2auotw4gga5jphgl7w6rysyvot2cfx5q";
@@ -38,16 +41,6 @@ let
       mv cpp-httplib-0.54.1 $out
     '';
 
-    opensslArchive = builtins.fetchurl {
-      url = "https://github.com/kzalewski/openssl-1.1.1/archive/refs/tags/1.1.1ze.tar.gz";
-      sha256 = "yzjxxnrt444sr3vagewltyi55e3y6kstz5zepciuqqeskcameuaq";
-    };
-
-    curlArchive = builtins.fetchurl {
-      url = "https://curl.se/download/curl-8.1.0.tar.xz";
-      sha256 = "npmavvhqogdqcwirefxoogc3sdjillcrmkxndppncrhz7ezdfi6a";
-    };
-
     pkg = stdenv.mkDerivation rec {
         name = "rekindled-server";
 
@@ -57,7 +50,7 @@ let
         };
 
         nativeBuildInputs = [ cmake pkg-config removeReferencesTo xz ];
-        buildInputs = [ libuuid sqlite openssl ];
+        buildInputs = [ libuuid sqlite openssl zlib ];
 
         enableParallelBuilding = true;
 
@@ -81,9 +74,8 @@ let
             # Prefer using FetchContent to download third-party sources at configure time
             # (falls back to system libraries if available).
             # When using Nix, supply the pre-fetched archive paths so CMake doesn't need network access.
+            # OpenSSL and zlib resolve to the nixpkgs-provided libraries via find_package.
             "-DREKINDLED_HTTPLIB_SOURCE_DIR=${httplibSrc}"
-            "-DREKINDLED_OPENSSL_ARCHIVE=file://${opensslArchive}"
-            "-DREKINDLED_CURL_ARCHIVE=file://${curlArchive}"
         ];
 
         # Can't pass multiple flags through cmakeFlags *sigh*

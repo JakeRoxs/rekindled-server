@@ -13,14 +13,15 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <thread>
+#include <atomic>
 
 #ifdef _WIN32
 #include <winsock2.h>
 #endif
 
-#include <curl/curl.h>
-
-// Simple class for sending HTTP requests
+// Simple class for sending HTTP requests. Implemented on cpp-httplib, which
+// replaces libcurl as the master-server / outbound HTTP client.
 
 enum class NetHttpMethod {
   OPTIONS,
@@ -47,7 +48,11 @@ private:
 
 class NetHttpRequest {
 public:
+  NetHttpRequest() = default;
   ~NetHttpRequest();
+
+  NetHttpRequest(const NetHttpRequest&) = delete;
+  NetHttpRequest& operator=(const NetHttpRequest&) = delete;
 
   void SetUrl(const std::string& Path);
   void SetMethod(NetHttpMethod Method);
@@ -61,19 +66,15 @@ public:
 
   std::shared_ptr<NetHttpResponse> GetResponse();
 
-protected:
-  bool StartRequest();
-  void PollRequest();
-  bool FinishRequest();
-
-  static size_t ReceiveBodyFunction(void* ptr, size_t size, size_t nmemb, NetHttpResponse* Response);
-
 private:
+  void Execute();
+
   std::vector<uint8_t> Body;
   NetHttpMethod Method = NetHttpMethod::GET;
   std::string Url = "/";
   std::shared_ptr<NetHttpResponse> Response;
 
-  CURL* Handle = nullptr;
-  CURLM* HandleMulti = nullptr;
+  std::thread AsyncThread;
+  std::atomic<bool> Started{false};
+  std::atomic<bool> Done{false};
 };

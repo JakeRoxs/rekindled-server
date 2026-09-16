@@ -10,8 +10,11 @@
       "name": "base",
       "hidden": true,
       "binaryDir": "${sourceDir}/intermediate/cmake/${presetName}",
+      "toolchainFile": "${sourceDir}/vcpkg-toolchain.cmake",
       "cacheVariables": {
-        "BUILD_TESTING": "ON"
+        "BUILD_TESTING": "ON",
+        "VCPKG_MANIFEST_MODE": "OFF",
+        "VCPKG_MANIFEST_DIR": "${sourceDir}"
       }
     },
     {
