@@ -1,7 +1,8 @@
 {
   "name": "rekindled-server",
   "version": "0.0.1",
-  "description": "vcpkg manifest for the Rekindled Server native build. Declares the third-party libraries the build resolves through vcpkg so that dependency provenance is reproducible across dev machines and CI. Resolved versions are pinned in CI via the vcpkg git tag; the version constraints here guard against resolving a legacy/vulnerable OpenSSL.",
+  "description": "vcpkg manifest for the Rekindled Server native build. Declares the third-party libraries the build resolves through vcpkg so that dependency provenance is reproducible across dev machines and CI. The builtin-baseline pins the vcpkg commit CI checks out; the version constraints guard against resolving a legacy/vulnerable OpenSSL.",
+  "builtin-baseline": "c76c06644034521fb761a39f8f52d8e87d1103d5",
   "dependencies": [
     {
       "name": "openssl",
