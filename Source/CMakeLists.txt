@@ -6,15 +6,8 @@
 
 add_subdirectory(ThirdParty)
 
-option(BUILD_LOADER_AVALONIA "Build the Avalonia loader project" ON)
-
 if (WIN32)
-    add_subdirectory(Loader)
     add_subdirectory(Injector)
-endif()
-
-if (BUILD_LOADER_AVALONIA)
-    add_subdirectory(Loader.Avalonia)
 endif()
 
 add_subdirectory(Server)

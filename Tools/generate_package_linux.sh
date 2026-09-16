@@ -11,20 +11,10 @@ PACKAGE_PLATFORM="${PACKAGE_PLATFORM:-x64}"
 LOADER_AVALONIA_LINUX_RUNTIME="${LOADER_AVALONIA_LINUX_RUNTIME:-linux-x64}"
 LOADER_AVALONIA_LINUX_PUBLISH_DIR="${LOADER_AVALONIA_LINUX_PUBLISH_DIR:-intermediate/publish/canonical/Loader.Avalonia}"
 
-OUTPUT_ROOT=""
-for candidate in \
-  build/Source/Server \
-  intermediate/build/Source/Server \
-  intermediate/make/Source/Server \
-  bin/x64_release; do
-  if [ -d "$candidate" ]; then
-    OUTPUT_ROOT="$candidate"
-    break
-  fi
- done
-
-if [ -z "$OUTPUT_ROOT" ]; then
-  echo "ERROR: No native Linux build output directory found. Check your build output path."
+NATIVE_BUILD_PRESET="${NATIVE_BUILD_PRESET:-linux-release}"
+OUTPUT_ROOT="${NATIVE_OUTPUT_ROOT:-intermediate/cmake/$NATIVE_BUILD_PRESET/bin/$PACKAGE_BUILD_CONFIGURATION}"
+if [ ! -f "$OUTPUT_ROOT/Server" ]; then
+  echo "ERROR: Server was not found in $OUTPUT_ROOT. Build the selected preset first."
   exit 1
 fi
 
@@ -88,14 +78,9 @@ fi
 
 if [ -f "$OUTPUT_ROOT/Server" ]; then
   copy_with_log "$OUTPUT_ROOT/Server" rekindled-server/Server/
-elif [ -f "build/Source/Server/Server" ]; then
-  copy_with_log "build/Source/Server/Server" rekindled-server/Server/
-elif [ -f "intermediate/build/Source/Server/Server" ]; then
-  copy_with_log "intermediate/build/Source/Server/Server" rekindled-server/Server/
-elif [ -f "intermediate/make/Source/Server/Server" ]; then
-  copy_with_log "intermediate/make/Source/Server/Server" rekindled-server/Server/
+
 else
-  echo "WARNING: Linux Server executable not found in $OUTPUT_ROOT or build/Source/Server or intermediate/make/Source/Server"
+  echo "WARNING: Linux Server executable not found in $OUTPUT_ROOT "
   ERR=1
 fi
 

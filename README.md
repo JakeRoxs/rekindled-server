@@ -159,89 +159,56 @@ https://github.com/jakeroxs/rekindled-server/blob/main/Source/Server/Config/Runt
 
 # How do I build it?
 
-The project is written in C++17 and uses CMake for cross-platform builds.
-
-**Required:** CMake should be configured with Ninja by default.
-
-Use:
-
-- `Ninja` (preferred, cross-platform)
+Native servers and the Windows injector use CMake; the loaders use .NET.
+The Node.js hub has a separate npm workflow in `Source/hub`.
 
 ## Prerequisites
 
-- [CMake](https://cmake.org/download/) (3.20+ recommended)
-- Visual Studio 2026 or 2022 + optional Clang-cl, or another CMake-compatible toolchain
-- .NET SDK 5.0 or later (`dotnet` command) – used by the WinForms loader project (project currently targets net5.0-windows)
-- Node.js & npm (only if you intend to build the hub server, which is
-  managed separately with npm)
+- CMake 3.21+ (4.2+ for Visual Studio 2026), .NET SDK 10, and PowerShell 7.
+- **Windows x64:** Visual Studio 2022 or 2026 with the Desktop development with C++ workload and a Windows SDK.
+- **Linux x64:** a C++17 compiler, Ninja, make, pkg-config, and OpenSSL, SQLite, zlib, and UUID development packages.
 
-The loader target is a SDK‑style .NET project with NuGet dependencies. CMake now
-includes a pre‑build step that runs `dotnet restore` using the same
-`BaseIntermediateOutputPath` and configuration that MSBuild will use, so you
-should **not** have to run `dotnet restore` manually. A clean checkout can be
-configured and built end‑to‑end with a single invocation of CMake:
+On Ubuntu, install the native build dependencies with:
+
+```sh
+sudo apt install build-essential cmake ninja-build pkg-config libssl-dev libsqlite3-dev zlib1g-dev uuid-dev
+```
+
+## Build and test
+
+From the repository root:
 
 ```powershell
-# from repo root
-cmake -S . -B build -G "Visual Studio 18 2026" -A x64  # or your preferred generator
-# Optional: append -T ClangCL if you have Visual Studio ClangCL toolset installed
-cmake --build build --config Debug --target ALL_BUILD
+pwsh ./Tools/build.ps1 -Configuration Release
 ```
 
-If you prefer to use the generated project files directly, run one of the
-`Tools/generate_*` scripts (Windows, WSL, etc.) and open the resulting
-solution in Visual Studio. The loader target will restore its NuGet packages
-automatically when you build.
+Add `-Test` to run tests, use `-Configuration Debug` for a debug build, or select
+`-Component Native` or `-Component Managed` to build just that part of the project.
+The helper selects Visual Studio/MSBuild on Windows and Ninja on Linux.
 
-Once generated the project files are stored in the intermediate folder, at this
-point you can just open them and build the project.
+Native builds can also use [CMake presets](CMakePresets.json) directly, without
+PowerShell or .NET. For example, on Linux:
 
-## Recommended local build helper
-
-If you want a consistent path across environments, use the provided helper script:
-
-```powershell
-pwsh .\Tools\build-cmake.ps1 -BuildType Release
+```sh
+cmake --preset linux-release
+cmake --build --preset linux-release --parallel 4
+ctest --preset linux-release
 ```
 
-The script automatically picks the first available supported generator:
+Native outputs are in `intermediate/cmake/<preset>/bin/<configuration>/`;
+loader outputs are in `bin/managed/<os>/<project>/`. Combined Windows builds
+place `Injector.dll` beside both loaders. Linux game launch also requires the
+external `proton-injector` helper and a Windows injector DLL.
 
-- Ninja if installed
-- Visual Studio (via vswhere) if installed
+## Packaging
 
-You can override explicitly:
+After a Release build, run `Tools/generate_package_windows.bat` on Windows or
+`bash Tools/generate_package_linux.sh` on Linux. Both assemble a release in
+`rekindled-server/`.
 
-```powershell
-pwsh .\Tools\build-cmake.ps1 -Generator "Ninja" -BuildType Debug
-pwsh .\Tools\build-cmake.ps1 -Generator "Visual Studio 18 2026" -BuildType Release
-```
-
-## Canonical package output paths
-
-Release packaging uses script-first entrypoints as the source of truth:
-
-- `Tools/generate_package_windows.bat`
-- `Tools/generate_package_linux.sh`
-
-Managed publish outputs are centralized to canonical paths owned by project configuration:
-
-- `intermediate/publish/canonical/Loader`
-- `intermediate/publish/canonical/Loader.Avalonia`
-
-The package scripts publish into these canonical locations and then assemble
-`rekindled-server/` from those outputs.
-
-Local package generation examples:
-
-```powershell
-# Windows
-./Tools/generate_package_windows.bat
-```
-
-```bash
-# Linux
-./Tools/generate_package_linux.sh
-```
+Packaging defaults to the `windows-release` or `linux-release` native preset.
+Set `NATIVE_BUILD_PRESET` when using another preset, such as
+`windows-vs2026-release` for Visual Studio 2026.
 
 ## Using nix (currently disabled until I figure out how to deal with dependencies in nix actions) 
 

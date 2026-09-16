@@ -21,14 +21,19 @@ BansHandler::BansHandler(WebUIService* InService)
     : WebUIHandler(InService) {
 }
 
-void BansHandler::Register(CivetServer* Server) {
-  Server->addHandler("/bans", this);
+void BansHandler::Register(httplib::Server* Server) {
+  Server->Get("/bans", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandleGet(Req, Res);
+  });
+  Server->Delete("/bans", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandleDelete(Req, Res);
+  });
 }
 
-bool BansHandler::handleGet(CivetServer* Server, struct mg_connection* Connection) {
-  if (!Service->IsAuthenticated(Connection)) {
-    mg_send_http_error(Connection, 401, "Token invalid.");
-    return true;
+void BansHandler::HandleGet(const httplib::Request& Req, httplib::Response& Res) {
+  if (!Service->IsAuthenticated(&Req)) {
+    SendError(Res, 401, "Token invalid.");
+    return;
   }
 
   ServerDatabase& Database = Service->GetServer()->GetDatabase();
@@ -66,22 +71,20 @@ bool BansHandler::handleGet(CivetServer* Server, struct mg_connection* Connectio
     json["bans"] = bansArray;
   }
 
-  RespondJson(Connection, json);
-
-  return true;
+  RespondJson(Res, json);
 }
 
-bool BansHandler::handleDelete(CivetServer* Server, struct mg_connection* Connection) {
-  if (!Service->IsAuthenticated(Connection)) {
-    mg_send_http_error(Connection, 401, "Token invalid.");
-    return true;
+void BansHandler::HandleDelete(const httplib::Request& Req, httplib::Response& Res) {
+  if (!Service->IsAuthenticated(&Req)) {
+    SendError(Res, 401, "Token invalid.");
+    return;
   }
 
   nlohmann::json json;
-  if (!ReadJson(Server, Connection, json) ||
+  if (!ReadJson(Req, json) ||
       !json.contains("steamId")) {
-    mg_send_http_error(Connection, 400, "Malformed body.");
-    return true;
+    SendError(Res, 400, "Malformed body.");
+    return;
   }
 
   std::string SteamId = json["steamId"];
@@ -92,7 +95,5 @@ bool BansHandler::handleDelete(CivetServer* Server, struct mg_connection* Connec
   Database.UnbanPlayer(SteamId);
 
   nlohmann::json responseJson;
-  RespondJson(Connection, responseJson);
-
-  return true;
+  RespondJson(Res, responseJson);
 }

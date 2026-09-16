@@ -50,6 +50,16 @@ test("normalizeServerId accepts safe IDs and rejects unsafe characters", () => {
 test("requireWriteAuth returns unauthorized for wrong header", () => {
     const req = { get: () => "bad-secret" };
     const res = makeRes();
-    requireWriteAuth(req, res);
+    const authError = requireWriteAuth(req, res);
     assert.strictEqual(res.statusCode, 401);
+    // Must return a truthy value so callers can short-circuit the request.
+    assert.ok(authError);
+});
+
+test("requireWriteAuth returns null for a correct secret", () => {
+    const req = { get: () => process.env.MASTER_SERVER_WRITE_SECRET };
+    const res = makeRes();
+    const authError = requireWriteAuth(req, res);
+    assert.strictEqual(authError, null);
+    assert.strictEqual(res.statusCode, null);
 });

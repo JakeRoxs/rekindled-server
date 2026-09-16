@@ -68,6 +68,10 @@ app.get("/", (req, res) => {
 
 app.use("/api/v1/servers", servers);
 
-app.listen(port, () => {
-    console.log(`This service is now listening on port ${port}!`);
-});
+module.exports = app;
+
+if (require.main === module) {
+    app.listen(port, () => {
+        console.log(`This service is now listening on port ${port}!`);
+    });
+}
