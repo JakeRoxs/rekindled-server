@@ -23,18 +23,20 @@ DebugStatisticsHandler::DebugStatisticsHandler(WebUIService* InService)
     : WebUIHandler(InService) {
 }
 
-void DebugStatisticsHandler::Register(CivetServer* Server) {
-  Server->addHandler("/debug_statistics", this);
+void DebugStatisticsHandler::Register(httplib::Server* Server) {
+  Server->Get("/debug_statistics", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandleGet(Req, Res);
+  });
 }
 
 void DebugStatisticsHandler::GatherData() {
   std::scoped_lock lock(DataMutex);
 }
 
-bool DebugStatisticsHandler::handleGet(CivetServer* Server, struct mg_connection* Connection) {
-  if (!Service->IsAuthenticated(Connection)) {
-    mg_send_http_error(Connection, 401, "Token invalid.");
-    return true;
+void DebugStatisticsHandler::HandleGet(const httplib::Request& Req, httplib::Response& Res) {
+  if (!Service->IsAuthenticated(&Req)) {
+    SendError(Res, 401, "Token invalid.");
+    return;
   }
 
   nlohmann::json json;
@@ -76,9 +78,7 @@ bool DebugStatisticsHandler::handleGet(CivetServer* Server, struct mg_connection
     json["logs"] = logs;
   }
 
-  RespondJson(Connection, json);
+  RespondJson(Res, json);
 
   MarkAsNeedsDataGather();
-
-  return true;
 }

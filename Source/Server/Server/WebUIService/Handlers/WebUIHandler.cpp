@@ -18,23 +18,25 @@ WebUIHandler::WebUIHandler(WebUIService* InService)
     : Service(InService) {
 }
 
-void WebUIHandler::RespondJson(struct mg_connection* Connection, nlohmann::json& Json) {
+void WebUIHandler::RespondJson(httplib::Response& Res, nlohmann::json& Json) {
   std::string result = Json.dump(4);
 
-  mg_send_http_ok(Connection, "application/json; charset=utf-8", result.size());
-  mg_write(Connection, result.data(), result.size());
+  Res.set_content(std::move(result), "application/json; charset=utf-8");
 }
 
-bool WebUIHandler::ReadJson(CivetServer* Server, struct mg_connection* Connection, nlohmann::json& Json) {
-  std::string Body = Server->getPostData(Connection);
-
+bool WebUIHandler::ReadJson(const httplib::Request& Req, nlohmann::json& Json) {
   try {
-    Json = nlohmann::json::parse(Body);
+    Json = nlohmann::json::parse(Req.body);
   } catch (nlohmann::json::parse_error) {
     return false;
   }
 
   return true;
+}
+
+void WebUIHandler::SendError(httplib::Response& Res, int Status, const std::string& Message) {
+  Res.status = Status;
+  Res.set_content(Message, "text/plain; charset=utf-8");
 }
 
 bool WebUIHandler::NeedsDataGather() {

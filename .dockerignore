@@ -64,3 +64,9 @@ enc_temp_folder/
 Publish/
 rekindled-server/
 node_modules/
+
+# Local build trees must never enter the container build context.
+/build*
+/bin/
+/intermediate/
+.git/

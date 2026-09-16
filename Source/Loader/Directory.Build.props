@@ -1,17 +1,3 @@
 <Project>
-  <PropertyGroup>
-    <!--
-      Resolve repository root from the location of this Directory.Build.props file.
-      This avoids depending on SolutionDir or project directory depth, and keeps
-      output under the repository-level Bin and Intermediate directories.
-    -->
-    <RepoRoot>$(MSBuildThisFileDirectory)\..\..</RepoRoot>
-
-    <!--
-      Include project name to avoid assets-file collisions between different SDK-style
-      projects/frameworks that share the same repo-level intermediate root on CI.
-    -->
-    <BaseIntermediateOutputPath>$(RepoRoot)\Intermediate\$(MSBuildProjectName)\$(Platform)_$(Configuration)\</BaseIntermediateOutputPath>
-    <BaseOutputPath>$(RepoRoot)\Bin\$(Platform)_$(Configuration)\</BaseOutputPath>
-  </PropertyGroup>
+  <Import Project="../Directory.Build.props" />
 </Project>

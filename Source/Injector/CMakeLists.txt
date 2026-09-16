@@ -30,39 +30,28 @@ set(INJECTOR_CORE_SOURCES
     Hooks/Shared/ChangeSaveGameFilenameHook.cpp
 )
 
-#Core injector implementation shared between the DLL and unit tests.
+# Core implementation is shared between the DLL and unit tests.
 add_library(InjectorCore STATIC ${INJECTOR_CORE_SOURCES})
+add_library(${PROJECT_NAME} SHARED Entry.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE InjectorCore)
 
-#Injector DLL entrypoint is built separately and links against the core implementation.
-            add_library(${PROJECT_NAME} SHARED Entry.cpp)
-#Link the core implementation into the DLL so its symbols are resolved.
-                target_link_libraries(${PROJECT_NAME} PUBLIC InjectorCore)
-                    add_dependencies(${PROJECT_NAME} InjectorCore)
+foreach(target IN ITEMS InjectorCore ${PROJECT_NAME})
+    target_include_directories(${target} PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/.."
+    )
+    target_compile_definitions(${target} PRIVATE
+        _CRT_SECURE_NO_WARNINGS
+        _WINSOCK_DEPRECATED_NO_WARNINGS
+        _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        _WINSOCKAPI_
+        _WIN32_WINNT=0x0A00
+    )
+    target_link_libraries(${target} PUBLIC Shared detours)
+endforeach()
 
-#Unit tests for the injector component
-                        add_subdirectory(Tests)
-
-#Enable testing here so add_test works even if subdirectories enable testing later.
-                            enable_testing()
-
-                                foreach (target IN ITEMS InjectorCore ${PROJECT_NAME})
-                                    target_include_directories(${target} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"
-                                                                                "${CMAKE_CURRENT_SOURCE_DIR}/../")
-
-                                    if (WIN32)
-                                        target_compile_definitions(${target} PRIVATE
-                                            _CRT_SECURE_NO_WARNINGS
-                                            _WINSOCK_DEPRECATED_NO_WARNINGS
-                                            _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
-                                            WIN32_LEAN_AND_MEAN
-                                            NOMINMAX
-                                            _WINSOCKAPI_
-                                            _WIN32_WINNT=0x0A00)
-                                    else()
-                                        target_compile_definitions(${target} PRIVATE
-                                            _CRT_SECURE_NO_WARNINGS
-                                            _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
-                                    endif()
-
-                                    target_link_libraries(${target} PUBLIC Shared detours)
-                                endforeach()
+if(BUILD_TESTING)
+    add_subdirectory(Tests)
+endif()

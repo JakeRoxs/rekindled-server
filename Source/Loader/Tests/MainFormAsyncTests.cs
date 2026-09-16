@@ -10,9 +10,22 @@ namespace Loader.Tests
   {
     private class TestMainForm : Loader.MainForm
     {
-      public TestMainForm()
+      private TestMainForm() : base(_ => "127.0.0.1")
       {
-        // Avoid designer initialization complexity.
+      }
+
+      public static TestMainForm Create()
+      {
+        var context = SynchronizationContext.Current;
+        try
+        {
+          return new TestMainForm();
+        }
+        finally
+        {
+          // These tests have no UI message loop to service WinForms continuations.
+          SynchronizationContext.SetSynchronizationContext(context);
+        }
       }
 
       public Task<string> TestResolveConnectIpAsync(ServerConfig config, CancellationToken cancellationToken)
@@ -34,7 +47,7 @@ namespace Loader.Tests
     [TestMethod]
     public async Task ResolveConnectIpAsync_CancelsImmediately()
     {
-      var form = new TestMainForm();
+      using var form = TestMainForm.Create();
       using var cts = new CancellationTokenSource();
       cts.Cancel();
 
@@ -45,7 +58,7 @@ namespace Loader.Tests
     [TestMethod]
     public async Task GetPublicKeyAsync_CancelsImmediately()
     {
-      var form = new TestMainForm();
+      using var form = TestMainForm.Create();
       using var cts = new CancellationTokenSource();
       cts.Cancel();
 
