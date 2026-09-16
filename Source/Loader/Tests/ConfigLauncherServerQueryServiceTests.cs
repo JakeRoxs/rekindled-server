@@ -46,14 +46,15 @@ namespace Loader.Tests
       }
     }
 
-    [TestMethod]
-    public void Launcher_ShouldRunContinualUpdate_TrueWhenSteamNotRunningOrNoProcess()
+    [DataTestMethod]
+    [DataRow(false, true)]
+    [DataRow(true, false)]
+    public void Launcher_ShouldRunContinualUpdate_WithoutGameProcess(bool steamReady, bool expected)
     {
-      var launcher = new Loader.Services.Launcher();
+      var launcher = new Loader.Services.Launcher(() => steamReady);
 
-      // Without process handle and Steam inactive, should be true.
       bool result = launcher.ShouldRunContinualUpdate();
-      Assert.IsTrue(result);
+      Assert.AreEqual(expected, result);
     }
 
     [TestMethod]
@@ -77,6 +78,7 @@ namespace Loader.Tests
 
       var result = await service.QueryServersAsync(cts.Token);
       Assert.IsNull(result);
+      Assert.AreEqual(0, service.QueryCount);
     }
 
     [TestMethod]
@@ -93,8 +95,11 @@ namespace Loader.Tests
 
     private sealed class TestableServerQueryService : Loader.Services.ServerQueryService
     {
+      public int QueryCount { get; private set; }
+
       public override Task<List<ServerConfig>> QueryServersFromHubAsync(CancellationToken cancellationToken)
       {
+        QueryCount++;
         return Task.FromResult(new List<ServerConfig> { new ServerConfig { Name = "demo" } });
       }
     }

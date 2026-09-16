@@ -17,9 +17,6 @@
 #include "Shared/Core/Utils/Logging.h"
 #include "Shared/Core/Utils/Strings.h"
 
-#include <civetweb.h>
-#include <CivetServer.h>
-
 #include <thread>
 #include <condition_variable>
 
@@ -27,21 +24,23 @@ ShardingHandler::ShardingHandler(WebUIService* InService)
     : WebUIHandler(InService) {
 }
 
-void ShardingHandler::Register(CivetServer* Server) {
-  Server->addHandler("/sharding", this);
+void ShardingHandler::Register(httplib::Server* Server) {
+  Server->Post("/sharding", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandlePost(Req, Res);
+  });
 }
 
-bool ShardingHandler::handlePost(CivetServer* WebServer, struct mg_connection* Connection) {
+void ShardingHandler::HandlePost(const httplib::Request& Req, httplib::Response& Res) {
   ServerManager& Manager = Service->GetServer()->GetManager();
 
   nlohmann::json json;
-  if (!ReadJson(WebServer, Connection, json) ||
+  if (!ReadJson(Req, json) ||
       !json.contains("serverName") ||
       !json.contains("serverPassword") ||
       !json.contains("serverGameType") ||
       !json.contains("machineId")) {
-    mg_send_http_error(Connection, 400, "Malformed body.");
-    return true;
+    SendError(Res, 400, "Malformed body.");
+    return;
   }
 
   std::string ServerName = json["serverName"];
@@ -49,7 +48,7 @@ bool ShardingHandler::handlePost(CivetServer* WebServer, struct mg_connection* C
   std::string ServerGameType = json["serverGameType"];
   std::string MachineId = json["machineId"];
 
-  std::string UserIp = mg_get_request_info(Connection)->remote_addr;
+  std::string UserIp = Req.remote_addr;
   if (size_t Pos = UserIp.find(":"); Pos != std::string::npos) {
     UserIp = UserIp.substr(0, Pos);
   }
@@ -60,8 +59,8 @@ bool ShardingHandler::handlePost(CivetServer* WebServer, struct mg_connection* C
 
   GameType ServerEnumGameType = GameType::Unknown;
   if (!ParseGameType(ServerGameType.c_str(), ServerEnumGameType)) {
-    mg_send_http_error(Connection, 400, "Malformed body, unknown game type.");
-    return true;
+    SendError(Res, 400, "Malformed body, unknown game type.");
+    return;
   }
 
   // Find existing server created by user, or created a new one.
@@ -86,14 +85,14 @@ bool ShardingHandler::handlePost(CivetServer* WebServer, struct mg_connection* C
     convar.wait(lock);
 
     if (!Success) {
-      mg_send_http_error(Connection, 500, "Failed to start server.");
-      return false;
+      SendError(Res, 500, "Failed to start server.");
+      return;
     }
 
     Instance = Manager.FindServer(ServerId);
     if (!Instance) {
-      mg_send_http_error(Connection, 500, "Failed to find server.");
-      return false;
+      SendError(Res, 500, "Failed to find server.");
+      return;
     }
   }
 
@@ -109,7 +108,5 @@ bool ShardingHandler::handlePost(CivetServer* WebServer, struct mg_connection* C
   responseJson["webUsername"] = Config.WebUIServerUsername;
   responseJson["webPassword"] = Config.WebUIServerPassword;
   responseJson["webUrl"] = StringFormat("http://%s:%i/", Hostname.c_str(), Config.WebUIServerPort);
-  RespondJson(Connection, responseJson);
-
-  return true;
+  RespondJson(Res, responseJson);
 }

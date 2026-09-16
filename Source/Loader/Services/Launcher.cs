@@ -11,6 +11,17 @@ namespace Loader.Services
 {
   public class Launcher
   {
+    private readonly Func<bool> isSteamRunningAndLoggedIn;
+
+    public Launcher() : this(SteamUtils.IsSteamRunningAndLoggedIn)
+    {
+    }
+
+    public Launcher(Func<bool> isSteamRunningAndLoggedIn)
+    {
+      this.isSteamRunningAndLoggedIn = isSteamRunningAndLoggedIn ?? throw new ArgumentNullException(nameof(isSteamRunningAndLoggedIn));
+    }
+
     public IntPtr RunningProcessHandle { get; private set; } = IntPtr.Zero;
     public uint RunningProcessId { get; private set; } = 0;
 
@@ -21,7 +32,7 @@ namespace Loader.Services
         return true;
       }
 
-      if (!SteamUtils.IsSteamRunningAndLoggedIn())
+      if (!isSteamRunningAndLoggedIn())
       {
         return true;
       }

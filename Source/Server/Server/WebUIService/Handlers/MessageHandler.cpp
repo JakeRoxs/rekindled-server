@@ -21,22 +21,24 @@ MessageHandler::MessageHandler(WebUIService* InService)
     : WebUIHandler(InService) {
 }
 
-void MessageHandler::Register(CivetServer* Server) {
-  Server->addHandler("/message", this);
+void MessageHandler::Register(httplib::Server* Server) {
+  Server->Post("/message", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandlePost(Req, Res);
+  });
 }
 
-bool MessageHandler::handlePost(CivetServer* Server, struct mg_connection* Connection) {
-  if (!Service->IsAuthenticated(Connection)) {
-    mg_send_http_error(Connection, 401, "Token invalid.");
-    return true;
+void MessageHandler::HandlePost(const httplib::Request& Req, httplib::Response& Res) {
+  if (!Service->IsAuthenticated(&Req)) {
+    SendError(Res, 401, "Token invalid.");
+    return;
   }
 
   nlohmann::json json;
-  if (!ReadJson(Server, Connection, json) ||
+  if (!ReadJson(Req, json) ||
       !json.contains("playerId") ||
       !json.contains("message")) {
-    mg_send_http_error(Connection, 400, "Malformed body.");
-    return true;
+    SendError(Res, 400, "Malformed body.");
+    return;
   }
 
   uint32_t playerId = json["playerId"];
@@ -56,7 +58,5 @@ bool MessageHandler::handlePost(CivetServer* Server, struct mg_connection* Conne
   }
 
   nlohmann::json responseJson;
-  RespondJson(Connection, responseJson);
-
-  return true;
+  RespondJson(Res, responseJson);
 }

@@ -22,14 +22,19 @@ SettingsHandler::SettingsHandler(WebUIService* InService)
     : WebUIHandler(InService) {
 }
 
-void SettingsHandler::Register(CivetServer* Server) {
-  Server->addHandler("/settings", this);
+void SettingsHandler::Register(httplib::Server* Server) {
+  Server->Get("/settings", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandleGet(Req, Res);
+  });
+  Server->Post("/settings", [this](const httplib::Request& Req, httplib::Response& Res) {
+    HandlePost(Req, Res);
+  });
 }
 
-bool SettingsHandler::handleGet(CivetServer* Server, struct mg_connection* Connection) {
-  if (!Service->IsAuthenticated(Connection)) {
-    mg_send_http_error(Connection, 401, "Token invalid.");
-    return true;
+void SettingsHandler::HandleGet(const httplib::Request& Req, httplib::Response& Res) {
+  if (!Service->IsAuthenticated(&Req)) {
+    SendError(Res, 401, "Token invalid.");
+    return;
   }
 
   RuntimeConfig& Config = Service->GetServer()->GetMutableConfig();
@@ -63,21 +68,19 @@ bool SettingsHandler::handleGet(CivetServer* Server, struct mg_connection* Conne
   }
   json["announcements"] = announcementsJson;
 
-  RespondJson(Connection, json);
-
-  return true;
+  RespondJson(Res, json);
 }
 
-bool SettingsHandler::handlePost(CivetServer* Server, struct mg_connection* Connection) {
-  if (!Service->IsAuthenticated(Connection)) {
-    mg_send_http_error(Connection, 401, "Token invalid.");
-    return true;
+void SettingsHandler::HandlePost(const httplib::Request& Req, httplib::Response& Res) {
+  if (!Service->IsAuthenticated(&Req)) {
+    SendError(Res, 401, "Token invalid.");
+    return;
   }
 
   nlohmann::json json;
-  if (!ReadJson(Server, Connection, json)) {
-    mg_send_http_error(Connection, 400, "Malformed body.");
-    return true;
+  if (!ReadJson(Req, json)) {
+    SendError(Res, 400, "Malformed body.");
+    return;
   }
 
   RuntimeConfig& Config = Service->GetServer()->GetMutableConfig();
@@ -181,9 +184,7 @@ bool SettingsHandler::handlePost(CivetServer* Server, struct mg_connection* Conn
 
   LogS("WebUI", "Settings were updated.");
 
-  RespondJson(Connection, json);
-
-  return true;
+  RespondJson(Res, json);
 }
 
 bool SettingsHandler::IsWeaponLevelMatchingDisabled() {

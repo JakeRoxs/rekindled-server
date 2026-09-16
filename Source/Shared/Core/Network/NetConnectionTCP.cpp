@@ -24,7 +24,7 @@
 namespace {
 // Maximum backlog of data in a packet streams send queue. Sending
 // packets beyond this will result in disconnect.
-static inline constexpr size_t k_max_send_buffer_size = 512 * 1024;
+inline constexpr size_t k_max_send_buffer_size = 512 * 1024;
 }; // namespace
 
 NetConnectionTCP::NetConnectionTCP(const std::string& InName)
@@ -32,7 +32,7 @@ NetConnectionTCP::NetConnectionTCP(const std::string& InName)
 }
 
 NetConnectionTCP::NetConnectionTCP(SocketType InSocket, const std::string& InName, const NetIPAddress& InAddress)
-    : Socket(InSocket), Name(InName), IPAddress(InAddress) {
+    : Name(InName), IPAddress(InAddress), Socket(InSocket) {
 }
 
 NetConnectionTCP::~NetConnectionTCP() {
@@ -118,7 +118,7 @@ std::shared_ptr<NetConnection> NetConnectionTCP::Accept() {
     unsigned long mode = 1;
     if (int result = ioctlsocket(NewSocket, FIONBIO, &mode); result != 0) {
       ErrorS(GetName().c_str(), "Failed to set socket to non blocking with error 0x%08x", result);
-      return false;
+      return nullptr;
     }
 #else
     int flags;
@@ -165,7 +165,7 @@ NetIPAddress NetConnectionTCP::GetAddress() {
   return IPAddress;
 }
 
-bool NetConnectionTCP::Connect(std::string Hostname, int Port, bool ForceLastIpEntry) {
+bool NetConnectionTCP::Connect(const std::string& Hostname, int Port, bool ForceLastIpEntry) {
   if (Socket != INVALID_SOCKET_VALUE) {
     return false;
   }
@@ -381,7 +381,7 @@ bool NetConnectionTCP::IsConnected() {
 
 bool NetConnectionTCP::Pump() {
   // Send any data that we are able to.
-  while (SendQueue.size() > 0) {
+  while (!SendQueue.empty()) {
     int BytesSent = 0;
     // LogS(GetName().c_str(), "SEND %i", SendQueue.size());
     if (!SendPartial(SendQueue, 0, (int)SendQueue.size(), BytesSent)) {

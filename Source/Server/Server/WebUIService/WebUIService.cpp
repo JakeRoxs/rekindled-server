@@ -41,15 +41,16 @@ WebUIService::WebUIService(Server* OwningServer)
 }
 
 WebUIService::~WebUIService() {
+  if (WebServer) {
+    WebServer->stop();
+  }
+  if (WebThread.joinable()) {
+    WebThread.join();
+  }
 }
 
 bool WebUIService::Init() {
   int Port = ServerInstance->GetConfig().WebUIServerPort;
-
-  if (mg_init_library(MG_FEATURES_FILES) == 0) {
-    ErrorS("WebUI", "Failed to initialize civitweb library.");
-    return false;
-  }
 
   std::filesystem::path StaticPath = std::filesystem::current_path() / "../../Source/WebUI/Static";
   if (!std::filesystem::exists(StaticPath)) {
@@ -60,24 +61,23 @@ bool WebUIService::Init() {
     return false;
   }
 
-  std::vector<std::string> Options;
-  Options.push_back("document_root");
-  Options.push_back(StaticPath.string());
-  Options.push_back("listening_ports");
-  Options.push_back(StringFormat("%i", Port));
-  Options.push_back("num_threads");
-  Options.push_back("5");
+  WebServer = std::make_unique<httplib::Server>();
 
-  try {
-    WebServer = std::make_shared<CivetServer>(Options);
-  } catch (CivetException&) {
-    ErrorS("WebUI", "Failed to create civet webserver.");
-    return false;
-  }
+  // Serve the static WebUI assets.
+  WebServer->set_mount_point("/", StaticPath.string());
 
   for (auto Handler : Handlers) {
     Handler->Register(WebServer.get());
   }
+
+  // Run the (blocking) listener on a background thread, since httplib's
+  // listen() blocks for the lifetime of the server. Bind all interfaces so
+  // the WebUI and sharding endpoints are reachable by local and remote clients.
+  WebThread = std::thread([this, Port]() {
+    if (!WebServer->listen("0.0.0.0", Port)) {
+      ErrorS("WebUI", "Failed to start WebUI listener.");
+    }
+  });
 
   Log("WebUI service is now listening at http://localhost:%i/", Port);
 
@@ -85,8 +85,11 @@ bool WebUIService::Init() {
 }
 
 bool WebUIService::Term() {
-  if (!mg_exit_library()) {
-    return false;
+  if (WebServer) {
+    WebServer->stop();
+  }
+  if (WebThread.joinable()) {
+    WebThread.join();
   }
 
   return true;
@@ -124,11 +127,11 @@ std::string WebUIService::AddAuthToken() {
   return NewToken.Token;
 }
 
-bool WebUIService::IsAuthenticated(const mg_connection* Connection) {
+bool WebUIService::IsAuthenticated(const httplib::Request* Req) {
   std::scoped_lock lock(StateMutex);
 
-  const char* AuthToken = mg_get_header(Connection, "Auth-Token");
-  if (AuthToken == nullptr) {
+  std::string AuthToken = Req->get_header_value("Auth-Token");
+  if (AuthToken.empty()) {
     return false;
   }
 
