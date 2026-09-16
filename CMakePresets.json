@@ -14,7 +14,8 @@
       "cacheVariables": {
         "BUILD_TESTING": "ON",
         "VCPKG_MANIFEST_MODE": "OFF",
-        "VCPKG_MANIFEST_DIR": "${sourceDir}"
+        "VCPKG_MANIFEST_DIR": "${sourceDir}",
+        "_VCPKG_INSTALLED_DIR": "${sourceDir}/vcpkg_installed"
       }
     },
     {
