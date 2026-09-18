@@ -108,6 +108,7 @@ bool Injector::Init(const std::filesystem::path& configPathOverride) {
   // Use RuntimeConfig helpers to determine the config file location.
   // This keeps file path logic centralized and enables overriding for tests.
   const auto cfgPath = (configPathOverride.empty() ? RuntimeConfig::GetConfigPath(DllPath) : configPathOverride);
+  LogS("Config", "Loading injector configuration: %ls", cfgPath.c_str());
 
   // Load configuration.
   if (!Config.Load(cfgPath)) {
@@ -191,6 +192,7 @@ bool Injector::Init(const std::filesystem::path& configPathOverride) {
 
   DWORD installResult = Hooks.InstallAll(ctx);
   if (installResult != ERROR_SUCCESS) {
+    LastInitError = "Failed to install hooks: " + std::to_string(installResult);
     return false;
   }
 
@@ -199,7 +201,11 @@ bool Injector::Init(const std::filesystem::path& configPathOverride) {
 
 bool Injector::Term() {
   Log("Uninstalling hooks ...");
-  Hooks.UninstallAll();
+  const DWORD result = Hooks.UninstallAll();
+  if (result != ERROR_SUCCESS) {
+    Error("Cannot detach injector safely (error=%lu); keeping DLL loaded.", result);
+    return false;
+  }
 
   Log("Terminating injector ...");
 

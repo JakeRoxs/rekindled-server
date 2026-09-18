@@ -8,63 +8,13 @@
  */
 
 #include "Server/ServerManager.h"
-#include "Client/Client.h"
 #include "Config/BuildConfig.h"
 #include "Shared/Core/Utils/Logging.h"
 #include "Shared/Platform/Platform.h"
 
-// DEBUG DEBUG DEBUG
-#include "Shared/Core/Utils/Protobuf.h"
-#include "Shared/Core/Utils/File.h"
-#include "Shared/Core/Utils/Strings.h"
-// #define DEBUG_TEST
-//  DEBUG DEBUG DEBUG
-
 #include <filesystem>
-#include <thread>
-
-#include <steam/steam_api.h>
-#include <steam/steam_gameserver.h>
-
-extern "C" void __cdecl SteamWarningHook(int nSeverity, const char* pchDebugText) {
-  LogS("Steam", "%i: %s", nSeverity, pchDebugText);
-}
-
-#ifdef DEBUG_TEST
-#pragma optimize("", off)
-void DebugTest() {
-  DecodedProtobufRegistry registry;
-
-  for (const auto& entry : std::filesystem::directory_iterator("Z:/rekindled-server/Temp/ProtobufDump")) {
-    if (entry.is_regular_file()) {
-      std::filesystem::path path = entry.path();
-
-      std::vector<uint8_t> bytes;
-      if (!ReadBytesFromFile(path, bytes)) {
-        break;
-      }
-
-      std::string className = path.stem().string().c_str();
-      if (size_t pos = className.find("_"); pos != std::string::npos) {
-        className = className.substr(pos + 1);
-      }
-
-      registry.Decode(className, bytes.data(), bytes.size());
-    }
-  }
-
-  std::string result = registry.ToString();
-  Log("%s", result.c_str());
-
-  Log("Loaded protobuf registry.");
-}
-#endif
 
 int main(int argc, char* argv[]) {
-  bool start_as_client_emulator = false;
-  std::string mode_arg = argc > 1 ? argv[1] : "";
-  start_as_client_emulator = (mode_arg == "-client_emulator");
-
 // only do this on Windows, on Linux its very common to not have writable
 // access to wherever the binary is installed
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
@@ -88,69 +38,20 @@ int main(int argc, char* argv[]) {
   Log("https://github.com/jakeroxs/rekindled-server");
   Log("");
 
-#ifdef DEBUG_TEST
-  DebugTest();
-#endif
-
   if (!PlatformInit()) {
     Error("Failed to initialize platform specific functionality.");
     return 1;
   }
 
-  if (start_as_client_emulator) {
-    if (!SteamAPI_Init()) {
-      Error("Failed to initialize steam api, please ensure steam is running.");
-      return 1;
-    }
-
-    SteamUtils()->SetWarningMessageHook(&SteamWarningHook);
+  ServerManager ServerManagerInstance;
+  if (!ServerManagerInstance.Init()) {
+    Error("Server failed to initialize.");
+    return 1;
   }
-
-  // TODO: Split this out into a separate application.
-  // TODO: Also do less crappy arg parsing.
-  if (start_as_client_emulator) {
-    std::array<std::thread, BuildConfig::CLIENT_EMULATOR_COUNT> ClientThreads;
-
-    for (size_t i = 0; i < BuildConfig::CLIENT_EMULATOR_COUNT; i++) {
-      ClientThreads[i] = std::thread([i]() {
-        Client::ClientConfig clientConfig;
-        clientConfig.DisablePersistentData = true;
-        clientConfig.InstanceId = i;
-
-        Client ClientInstance(clientConfig);
-
-        if (!ClientInstance.Init()) {
-          Error("Client emulator failed to initialize.");
-          return;
-        }
-
-        ClientInstance.RunUntilQuit();
-
-        if (!ClientInstance.Term()) {
-          Error("Client emulator failed to terminate.");
-          return;
-        }
-      });
-    }
-
-    for (size_t i = 0; i < BuildConfig::CLIENT_EMULATOR_COUNT; i++) {
-      ClientThreads[i].join();
-    }
-  } else {
-    ServerManager ServerManagerInstance;
-    if (!ServerManagerInstance.Init()) {
-      Error("Server failed to initialize.");
-      return 1;
-    }
-    ServerManagerInstance.RunUntilQuit();
-    if (!ServerManagerInstance.Term()) {
-      Error("Server failed to terminate.");
-      return 1;
-    }
-  }
-
-  if (start_as_client_emulator) {
-    SteamAPI_Shutdown();
+  ServerManagerInstance.RunUntilQuit();
+  if (!ServerManagerInstance.Term()) {
+    Error("Server failed to terminate.");
+    return 1;
   }
 
   if (!PlatformTerm()) {

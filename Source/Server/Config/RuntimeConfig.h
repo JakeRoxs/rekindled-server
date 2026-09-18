@@ -219,6 +219,15 @@ public:
   // Password to login into web-ui with.
   std::string WebUIServerPassword = "";
 
+  // Enable HTTPS for the web-ui server.
+  bool WebUIServerUseHTTPS = false;
+
+  // Path to the SSL certificate file for HTTPS (PEM format).
+  std::string WebUIServerCertPath = "";
+
+  // Path to the SSL private key file for HTTPS (PEM format).
+  std::string WebUIServerKeyPath = "";
+
   // Announcements that show up when a user joins the game.
   std::vector<RuntimeConfigAnnouncement> Announcements = {
       {"Welcome to Rekindled Server", "\nYou have connected to an unofficial, work-in-progress, Dark Souls server. Stability is not guaranteed, but welcome!\n\nMore information on this project is available here:\nhttps://github.com/jakeroxs/rekindled-server"}};

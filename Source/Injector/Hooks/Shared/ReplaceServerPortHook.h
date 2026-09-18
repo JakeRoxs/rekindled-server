@@ -16,7 +16,7 @@
 class ReplaceServerPortHook : public Hook {
 public:
   virtual HookError Install(const InjectorContext& context) override;
-  virtual void Uninstall() override;
+  bool Uninstall() override;
   virtual const char* GetName() override;
 
   const GameType& GetGameType() const { return m_gameType; }

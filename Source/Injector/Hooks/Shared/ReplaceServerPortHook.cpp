@@ -12,7 +12,7 @@
 #include "Injector/InjectorContext.h"
 #include "Shared/Core/Utils/Logging.h"
 #include "Shared/Core/Utils/Strings.h"
-#include "ThirdParty/detours/src/detours.h"
+#include "Injector/DetourLifetime.h"
 
 #include <atomic>
 #include <vector>
@@ -29,12 +29,16 @@ connect_p s_original_connect;
 static std::atomic<ReplaceServerPortHook*> s_instance{nullptr};
 
 int WSAAPI ConnectHook(SOCKET s, const sockaddr* name, int namelen) {
+  InjectorDetours::CallbackScope callbackScope;
   auto instance = s_instance.load(std::memory_order_acquire);
   if (!instance) {
     return s_original_connect(s, name, namelen);
   }
 
-  sockaddr_in* addr = (sockaddr_in*)name;
+  if (!name || namelen < sizeof(sockaddr_in) || name->sa_family != AF_INET)
+    return s_original_connect(s, name, namelen);
+  sockaddr_in address = *reinterpret_cast<const sockaddr_in*>(name);
+  sockaddr_in* addr = &address;
 
   int redirect_port_number = 0;
   switch (instance->GetGameType()) {
@@ -55,7 +59,7 @@ int WSAAPI ConnectHook(SOCKET s, const sockaddr* name, int namelen) {
     addr->sin_port = htons(instance->GetServerPort());
   }
 
-  return s_original_connect(s, name, namelen);
+  return s_original_connect(s, reinterpret_cast<const sockaddr*>(addr), sizeof(address));
 }
 }; // namespace
 
@@ -63,13 +67,9 @@ HookError ReplaceServerPortHook::Install(const InjectorContext& context) {
   GetGameType() = context.GameType;
   GetServerPort() = context.Config.ServerPort;
 
-  DetourTransactionBegin();
-  DetourUpdateThread(GetCurrentThread());
-
   s_original_connect = static_cast<connect_p>(::connect);
-  DetourAttach(&(PVOID&)s_original_connect, ConnectHook);
-
-  LONG result = DetourTransactionCommit();
+  s_instance.store(this, std::memory_order_release);
+  const LONG result = InjectorDetours::Attach(reinterpret_cast<void**>(&s_original_connect), reinterpret_cast<void*>(ConnectHook));
   if (result == ERROR_SUCCESS) {
     s_instance.store(this, std::memory_order_release);
     return HookError::Success;
@@ -77,13 +77,14 @@ HookError ReplaceServerPortHook::Install(const InjectorContext& context) {
   return HookError::DetourFailed;
 }
 
-void ReplaceServerPortHook::Uninstall() {
+bool ReplaceServerPortHook::Uninstall() {
   // Only clear the global instance if it still points at us.
   // This avoids clearing it if a newer instance was installed.
   auto current = s_instance.load(std::memory_order_acquire);
   if (current == this) {
     s_instance.store(nullptr, std::memory_order_release);
   }
+  return true;
 }
 
 const char* ReplaceServerPortHook::GetName() {

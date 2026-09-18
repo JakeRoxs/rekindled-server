@@ -1,0 +1,6 @@
+# Standalone DLL injector for testing
+add_executable(InjectDS3 InjectDS3.cpp)
+target_sources(InjectDS3 PRIVATE ../Source/Injector/InjectorLog.cpp)
+target_include_directories(InjectDS3 PRIVATE "${CMAKE_SOURCE_DIR}/Source")
+target_compile_definitions(InjectDS3 PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(InjectDS3 PRIVATE Shared)

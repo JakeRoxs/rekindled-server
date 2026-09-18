@@ -583,7 +583,22 @@ namespace Loader
         return;
       }
 
-      UpdateGameTypeFromTabSelection();
+      int selectedIndex = GameTabControl.SelectedIndex;
+      if (selectedIndex == 2)
+      {
+        // Tools tab
+        ServerListGrid.IsVisible = false;
+        SaveEditor.IsVisible = true;
+        FooterGrid.IsVisible = false;
+      }
+      else
+      {
+        // Game tabs
+        ServerListGrid.IsVisible = true;
+        SaveEditor.IsVisible = false;
+        FooterGrid.IsVisible = true;
+        UpdateGameTypeFromTabSelection();
+      }
     }
 
     private async void CopyHostButton_OnClick(object? sender, RoutedEventArgs e)

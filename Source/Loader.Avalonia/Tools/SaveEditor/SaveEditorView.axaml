@@ -1,0 +1,117 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Loader.Tools.SaveEditor"
+             x:Class="Loader.Tools.SaveEditor.SaveEditorView"
+             Padding="16">
+
+  <UserControl.Styles>
+    <Style Selector="Button.slot-action">
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="MinWidth" Value="100" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+
+    <Style Selector="Button.slot-action:focus">
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="#79AFFF" />
+    </Style>
+
+    <Style Selector="Border.slot-card">
+      <Setter Property="Background" Value="#2E3F52" />
+      <Setter Property="Padding" Value="12" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+
+    <Style Selector="Border.slot-card.selected">
+      <Setter Property="BorderBrush" Value="#79AFFF" />
+      <Setter Property="Background" Value="#3A4F6A" />
+    </Style>
+
+    <Style Selector="Border.save-panel">
+      <Setter Property="Background" Value="#1E2836" />
+      <Setter Property="Padding" Value="12" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+
+    <Style Selector="Border.save-panel > TextBlock.panel-header">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+
+    <Style Selector="TextBlock.slot-name">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="TextBlock.slot-info">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="#AAB4C4" />
+    </Style>
+
+    <Style Selector="Button.direction-btn">
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="MinWidth" Value="60" />
+      <Setter Property="FontSize" Value="16" />
+      <Setter Property="Margin" Value="0,4" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12">
+    <TextBlock Text="Save Editor" FontSize="20" FontWeight="Bold" Grid.Row="0" />
+
+    <!-- Bank -->
+    <Border Classes="save-panel" Grid.Row="1">
+      <DockPanel>
+        <TextBlock Text="Character Bank" Classes="panel-header" DockPanel.Dock="Top" />
+        <Button Content="Clear Bank" Classes="slot-action" DockPanel.Dock="Right" Click="ClearBankButton_OnClick" />
+        <ScrollViewer DockPanel.Dock="Top" Height="100" HorizontalScrollBarVisibility="Hidden">
+          <WrapPanel x:Name="BankPanel" />
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+
+    <!-- Main save panels -->
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto,*" ColumnSpacing="12">
+      <!-- Source save panel -->
+      <Border Classes="save-panel" Grid.Column="0">
+        <DockPanel>
+          <TextBlock Text="Source Save" Classes="panel-header" DockPanel.Dock="Top" />
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <Button Content="Load Save" Classes="slot-action" Click="SourceLoadButton_OnClick" />
+            <Button Content="Save" Classes="slot-action" Click="SourceSaveButton_OnClick" />
+          </StackPanel>
+          <TextBlock x:Name="SourcePathText" Text="No save loaded" DockPanel.Dock="Top" Margin="0,0,0,8" FontSize="12" Foreground="#AAB4C4" />
+          <ScrollViewer HorizontalScrollBarVisibility="Hidden">
+            <StackPanel x:Name="SourceSlotsPanel" />
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+      <!-- Center arrows -->
+      <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+        <Button x:Name="CopyRightButton" Content="→" Classes="direction-btn" Click="CopyRightButton_OnClick" />
+        <Button Content="⇄" Classes="direction-btn" Click="SwapDirectionButton_OnClick" />
+      </StackPanel>
+
+      <!-- Destination save panel -->
+      <Border Classes="save-panel" Grid.Column="2">
+        <DockPanel>
+          <TextBlock Text="Destination Save" Classes="panel-header" DockPanel.Dock="Top" />
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+            <Button Content="Load Save" Classes="slot-action" Click="DestLoadButton_OnClick" />
+            <Button Content="Save" Classes="slot-action" Click="DestSaveButton_OnClick" />
+          </StackPanel>
+          <TextBlock x:Name="DestPathText" Text="No save loaded" DockPanel.Dock="Top" Margin="0,0,0,8" FontSize="12" Foreground="#AAB4C4" />
+          <ScrollViewer HorizontalScrollBarVisibility="Hidden">
+            <StackPanel x:Name="DestSlotsPanel" />
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

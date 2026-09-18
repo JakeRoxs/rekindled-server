@@ -15,7 +15,7 @@
 #include "Shared/Core/Utils/Rtti.h"
 #include "Shared/Core/Utils/Protobuf.h"
 #include "Shared/Core/Utils/File.h"
-#include "ThirdParty/detours/src/detours.h"
+#include "Injector/DetourLifetime.h"
 
 #include <vector>
 #include <iterator>
@@ -29,6 +29,7 @@ using SerializeWithCachedSizesToArray_p = uint8_t* (*)(void* this_ptr, uint8_t* 
 SerializeWithCachedSizesToArray_p s_original_SerializeWithCachedSizesToArray;
 
 uint8_t* SerializeWithCachedSizesToArrayHook(void* this_ptr, uint8_t* target) {
+  InjectorDetours::CallbackScope callbackScope;
   std::string RttiName = GetRttiNameFromObject(this_ptr);
   std::string ClassName = RttiName;
   if (size_t pos = ClassName.find_last_of(':'); pos != std::string::npos) {
@@ -62,6 +63,7 @@ using ParseFromArray_p = bool (*)(void* this_ptr, void* data, int size);
 ParseFromArray_p s_original_ParseFromArray;
 
 bool ParseFromArrayHook(void* this_ptr, void* data, int size) {
+  InjectorDetours::CallbackScope callbackScope;
   std::string RttiName = GetRttiNameFromObject(this_ptr);
   std::string ClassName = RttiName;
   if (size_t pos = ClassName.find_last_of(':'); pos != std::string::npos) {
@@ -151,13 +153,8 @@ HookError DS2_LogProtobufsHook::Install_SerializeWithCachedSizesToArray(const In
     return HookError::NotFound;
   }
 
-  DetourTransactionBegin();
-  DetourUpdateThread(GetCurrentThread());
-
   s_original_SerializeWithCachedSizesToArray = reinterpret_cast<SerializeWithCachedSizesToArray_p>(matches[0]);
-  DetourAttach(&(PVOID&)s_original_SerializeWithCachedSizesToArray, SerializeWithCachedSizesToArrayHook);
-
-  LONG result = DetourTransactionCommit();
+  const LONG result = InjectorDetours::Attach(reinterpret_cast<void**>(&s_original_SerializeWithCachedSizesToArray), reinterpret_cast<void*>(SerializeWithCachedSizesToArrayHook));
   return (result == NO_ERROR) ? HookError::Success : HookError::DetourFailed;
 }
 
@@ -191,13 +188,8 @@ HookError DS2_LogProtobufsHook::Install_ParseFromArray(const InjectorContext& co
     return HookError::NotFound;
   }
 
-  DetourTransactionBegin();
-  DetourUpdateThread(GetCurrentThread());
-
   s_original_ParseFromArray = reinterpret_cast<ParseFromArray_p>(matches[0]);
-  DetourAttach(&(PVOID&)s_original_ParseFromArray, ParseFromArrayHook);
-
-  LONG result = DetourTransactionCommit();
+  const LONG result = InjectorDetours::Attach(reinterpret_cast<void**>(&s_original_ParseFromArray), reinterpret_cast<void*>(ParseFromArrayHook));
   return (result == NO_ERROR) ? HookError::Success : HookError::DetourFailed;
 }
 
@@ -209,7 +201,8 @@ HookError DS2_LogProtobufsHook::Install(const InjectorContext& context) {
   return Install_ParseFromArray(context);
 }
 
-void DS2_LogProtobufsHook::Uninstall() {
+bool DS2_LogProtobufsHook::Uninstall() {
+  return true;
 }
 
 const char* DS2_LogProtobufsHook::GetName() {

@@ -11,7 +11,7 @@
 #include "Injector/Hooks/Shared/ChangeSaveGameFilenameHook.h"
 #include "Shared/Core/Utils/Logging.h"
 #include "Shared/Core/Utils/Strings.h"
-#include "ThirdParty/detours/src/detours.h"
+#include "Injector/DetourLifetime.h"
 
 #include <vector>
 #include <iterator>
@@ -22,6 +22,7 @@ using create_file_p = HANDLE(WINAPI*)(LPCWSTR lpFileName, DWORD dwDesiredAccess,
 create_file_p s_original_create_file = CreateFileW;
 
 HANDLE WINAPI CreateFileHook(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile) {
+  InjectorDetours::CallbackScope callbackScope;
   std::string filename = NarrowString(lpFileName);
 
   const std::string extension_sl2 = ".sl2";
@@ -40,15 +41,13 @@ HANDLE WINAPI CreateFileHook(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dw
 }; // namespace
 
 HookError ChangeSaveGameFilenameHook::Install(const InjectorContext& /*context*/) {
-  DetourTransactionBegin();
-  DetourUpdateThread(GetCurrentThread());
-  DetourAttach(&(PVOID&)s_original_create_file, CreateFileHook);
-  LONG result = DetourTransactionCommit();
+  const LONG result = InjectorDetours::Attach(reinterpret_cast<void**>(&s_original_create_file), reinterpret_cast<void*>(CreateFileHook));
 
   return (result == NO_ERROR) ? HookError::Success : HookError::DetourFailed;
 }
 
-void ChangeSaveGameFilenameHook::Uninstall() {
+bool ChangeSaveGameFilenameHook::Uninstall() {
+  return true;
 }
 
 const char* ChangeSaveGameFilenameHook::GetName() {

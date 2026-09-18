@@ -20,6 +20,8 @@
 #include <queue>
 #include <unordered_map>
 #include <functional>
+#include <atomic>
+#include <condition_variable>
 
 // The server manager essentially manages multiple server shards running on the same machine.
 
@@ -48,11 +50,14 @@ private:
   void PruneOldServers();
 
 private:
-  bool QuitReceived = false;
+  std::atomic<bool> QuitReceived{false};
 
   double NextServerPruneTime = 0.0f;
 
   std::recursive_mutex m_mutex;
+
+  std::mutex EventMutex;
+  std::condition_variable EventCV;
 
   PlatformEvents::CtrlSignalEvent::DelegatePtr CtrlSignalHandle = nullptr;
 

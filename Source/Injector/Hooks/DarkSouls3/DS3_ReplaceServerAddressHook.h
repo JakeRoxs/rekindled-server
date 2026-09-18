@@ -19,7 +19,7 @@
 class DS3_ReplaceServerAddressHook : public Hook {
 public:
   virtual HookError Install(const InjectorContext& context) override;
-  virtual void Uninstall() override;
+  bool Uninstall() override;
   virtual const char* GetName() override;
 
   // Exposed for the detour callback to access config values without global statics.

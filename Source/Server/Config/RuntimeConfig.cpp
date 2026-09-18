@@ -382,6 +382,9 @@ bool RuntimeConfig::Serialize(nlohmann::json& Json, bool Loading) {
   SERIALIZE_VAR(WebUIServerPort);
   SERIALIZE_VAR(WebUIServerUsername);
   SERIALIZE_VAR(WebUIServerPassword);
+  SERIALIZE_VAR(WebUIServerUseHTTPS);
+  SERIALIZE_VAR(WebUIServerCertPath);
+  SERIALIZE_VAR(WebUIServerKeyPath);
   SERIALIZE_VAR(Announcements);
   SERIALIZE_VAR(DatabaseTrimInterval);
   SERIALIZE_VAR(BloodMessageMaxLivePoolEntriesPerArea);

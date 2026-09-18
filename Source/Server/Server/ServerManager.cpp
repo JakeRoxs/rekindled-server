@@ -25,9 +25,10 @@
 
 ServerManager::ServerManager() {
   // Register for Ctrl+C notifications, its the only way the server shuts down right now.
-  CtrlSignalHandle = PlatformEvents::OnCtrlSignal.Register([=]() {
+  CtrlSignalHandle = PlatformEvents::OnCtrlSignal.Register([this]() {
     Warning("Quit signal received, starting shutdown.");
-    QuitReceived = true;
+    QuitReceived.store(true, std::memory_order_release);
+    EventCV.notify_one();
   });
 }
 
@@ -80,61 +81,67 @@ bool ServerManager::Term() {
 void ServerManager::RunUntilQuit() {
   Success("Server manager is now running.");
 
-  // We should really do this event driven ...
-  // This suffices for now.
-  while (!QuitReceived) {
-    std::scoped_lock lock(m_mutex);
-
+  while (!QuitReceived.load(std::memory_order_acquire)) {
     {
-      DebugTimerScope Scope(Debug::AllServerUpdateTime);
-      for (auto& Server : ServerInstances) {
-        Server->Poll();
-      }
-    }
+      std::scoped_lock lock(m_mutex);
 
-    if (GetSeconds() > NextServerPruneTime) {
-      PruneOldServers();
-      NextServerPruneTime = GetSeconds() + 60.0f;
-    }
-
-    // Execute all callbacks.
-    {
-      std::scoped_lock lock(CallbackMutex);
-      for (auto& callback : Callbacks) {
-        callback();
+      {
+        DebugTimerScope Scope(Debug::AllServerUpdateTime);
+        for (auto& Server : ServerInstances) {
+          Server->Poll();
+        }
       }
 
-      Callbacks.clear();
-    }
-
-    // Emit some statistics periodically.
-    double Elapsed = GetSeconds() - LastStatsPrint;
-    if (Elapsed > 30.0f) {
-      size_t PlayerCount = 0;
-      for (auto& Server : ServerInstances) {
-        PlayerCount += Server->GetService<GameService>()->GetClients().size();
+      if (GetSeconds() > NextServerPruneTime) {
+        PruneOldServers();
+        NextServerPruneTime = GetSeconds() + 60.0f;
       }
 
-      WriteLog(true, ConsoleColor::Grey, "", "Log", "%zi players | %zi servers | %.2f ms update | connections auth %.2f login %.2f game %.2f p/s | tcp in %.2f out %.2f kb/s | udp in %.2f out %.2f kb/s | database queries %.2f p/s ",
-               PlayerCount,
-               ServerInstances.size(),
-               Debug::AllServerUpdateTime.GetAverage() * 1000.0f,
-               Debug::AuthConnections.GetAverageRate(),
-               Debug::LoginConnections.GetAverageRate(),
-               Debug::GameConnections.GetAverageRate(),
-               (Debug::TcpBytesReceived.GetAverageRate()) / 1024.0f,
-               (Debug::TcpBytesSent.GetAverageRate()) / 1024.0f,
-               (Debug::UdpBytesReceived.GetAverageRate()) / 1024.0f,
-               (Debug::UdpBytesSent.GetAverageRate()) / 1024.0f,
-               Debug::DatabaseQueries.GetAverageRate());
+      // Execute all callbacks.
+      {
+        std::scoped_lock lock(CallbackMutex);
+        for (auto& callback : Callbacks) {
+          callback();
+        }
 
-      LastStatsPrint = GetSeconds();
+        Callbacks.clear();
+      }
+
+      // Emit some statistics periodically.
+      double Elapsed = GetSeconds() - LastStatsPrint;
+      if (Elapsed > 30.0f) {
+        size_t PlayerCount = 0;
+        for (auto& Server : ServerInstances) {
+          PlayerCount += Server->GetService<GameService>()->GetClients().size();
+        }
+
+        WriteLog(true, ConsoleColor::Grey, "", "Log", "%zi players | %zi servers | %.2f ms update | connections auth %.2f login %.2f game %.2f p/s | tcp in %.2f out %.2f kb/s | udp in %.2f out %.2f kb/s | database queries %.2f p/s ",
+                 PlayerCount,
+                 ServerInstances.size(),
+                 Debug::AllServerUpdateTime.GetAverage() * 1000.0f,
+                 Debug::AuthConnections.GetAverageRate(),
+                 Debug::LoginConnections.GetAverageRate(),
+                 Debug::GameConnections.GetAverageRate(),
+                 (Debug::TcpBytesReceived.GetAverageRate()) / 1024.0f,
+                 (Debug::TcpBytesSent.GetAverageRate()) / 1024.0f,
+                 (Debug::UdpBytesReceived.GetAverageRate()) / 1024.0f,
+                 (Debug::UdpBytesSent.GetAverageRate()) / 1024.0f,
+                 Debug::DatabaseQueries.GetAverageRate());
+
+        LastStatsPrint = GetSeconds();
+      }
+
+      DebugCounter::PollAll();
+      DebugTimer::PollAll();
     }
 
-    DebugCounter::PollAll();
-    DebugTimer::PollAll();
-
-    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    // Wait for up to 1 second for an event, or until woken up.
+    // This preserves the periodic tick for Server::Poll() housekeeping
+    // while avoiding a busy loop when idle.
+    std::unique_lock<std::mutex> EventLock(EventMutex);
+    EventCV.wait_for(EventLock, std::chrono::seconds(1), [this]() {
+      return QuitReceived.load(std::memory_order_acquire);
+    });
   }
 }
 
@@ -145,52 +152,58 @@ bool ServerManager::NewServer(const std::string& Name, const std::string& Passwo
 }
 
 void ServerManager::QueueCallback(std::function<void()> callback) {
-  std::scoped_lock lock(CallbackMutex);
-
-  Callbacks.push_back(callback);
+  {
+    std::scoped_lock lock(CallbackMutex);
+    Callbacks.push_back(callback);
+  }
+  EventCV.notify_one();
 }
 
 bool ServerManager::StartServer(const std::string& ServerId, const std::string& Name, const std::string& Password, GameType InGameType) {
-  std::scoped_lock lock(m_mutex);
+  {
+    std::scoped_lock lock(m_mutex);
 
-  Log("Starting server %s ...", ServerId.c_str());
+    Log("Starting server %s ...", ServerId.c_str());
 
-  std::unique_ptr<Server> Instance = std::make_unique<Server>(ServerId, Name, Password, InGameType, this);
-  Server* InstancePtr = Instance.get();
-  ServerInstances.push_back(std::move(Instance));
+    std::unique_ptr<Server> Instance = std::make_unique<Server>(ServerId, Name, Password, InGameType, this);
+    Server* InstancePtr = Instance.get();
+    ServerInstances.push_back(std::move(Instance));
 
-  if (!InstancePtr->Init()) {
-    ServerInstances.pop_back();
-    return false;
+    if (!InstancePtr->Init()) {
+      ServerInstances.pop_back();
+      return false;
+    }
+
+    return true;
   }
-
-  return true;
+  EventCV.notify_one();
 }
 
 bool ServerManager::StopServer(const std::string& ServerId, bool Permanent) {
-  std::scoped_lock lock(m_mutex);
-
-  Log("Stopping server %s ...", ServerId.c_str());
-
   bool Success = true;
+  {
+    std::scoped_lock lock(m_mutex);
 
-  for (auto iter = ServerInstances.begin(); iter != ServerInstances.end(); /* empty */) {
-    Server* Instance = (*iter).get();
-    if (Instance->GetId() == ServerId) {
-      Success |= Instance->Term();
+    Log("Stopping server %s ...", ServerId.c_str());
 
-      if (Permanent) {
-        // Delete the folder the server configuration is stored in.
-        std::filesystem::path path = Instance->GetSavedPath();
-        std::filesystem::remove_all(path);
+    for (auto iter = ServerInstances.begin(); iter != ServerInstances.end(); /* empty */) {
+      Server* Instance = (*iter).get();
+      if (Instance->GetId() == ServerId) {
+        Success |= Instance->Term();
+
+        if (Permanent) {
+          // Delete the folder the server configuration is stored in.
+          std::filesystem::path path = Instance->GetSavedPath();
+          std::filesystem::remove_all(path);
+        }
+
+        iter = ServerInstances.erase(iter);
+      } else {
+        iter++;
       }
-
-      iter = ServerInstances.erase(iter);
-    } else {
-      iter++;
     }
   }
-
+  EventCV.notify_one();
   return Success;
 }
 

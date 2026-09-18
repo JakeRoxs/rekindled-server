@@ -32,6 +32,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ThirdParty\SoulsFormats\SoulsFormats\SoulsFormats.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="Tests\**\*.cs" />
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>Loader.Avalonia.Tests</_Parameter1>

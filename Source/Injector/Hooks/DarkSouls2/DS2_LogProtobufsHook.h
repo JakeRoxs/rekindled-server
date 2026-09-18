@@ -16,7 +16,7 @@
 class DS2_LogProtobufsHook : public Hook {
 public:
   virtual HookError Install(const InjectorContext& context) override;
-  virtual void Uninstall() override;
+  bool Uninstall() override;
   virtual const char* GetName() override;
 
 private:

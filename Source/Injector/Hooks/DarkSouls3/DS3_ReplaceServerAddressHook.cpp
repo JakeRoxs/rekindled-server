@@ -10,16 +10,20 @@
 
 #include "Injector/Hooks/DarkSouls3/DS3_ReplaceServerAddressHook.h"
 #include "Injector/InjectorContext.h"
+#include "Injector/DetourLifetime.h"
 #include "Shared/Core/Utils/Logging.h"
 #include "Shared/Core/Utils/Strings.h"
-#include "ThirdParty/detours/src/detours.h"
 
 #include <vector>
 #include <iterator>
+#include <array>
+#include <atomic>
+
 
 namespace {
 using vector_insert_range_p = void(__fastcall*)(void* self, void* where, void* first, void* last);
 vector_insert_range_p s_original_vector_insert_range;
+std::atomic<bool> s_callbackObserved{false};
 
 // Instance pointer for the currently installed hook.
 // This is safe because we only install one hook instance at a time,
@@ -27,6 +31,7 @@ vector_insert_range_p s_original_vector_insert_range;
 static ::DS3_ReplaceServerAddressHook* s_instance = nullptr;
 
 void __fastcall VectorInsertRangeHook(void* self, void* where, void* first, void* last) {
+  InjectorDetours::CallbackScope callbackScope;
   if (!s_instance) {
     s_original_vector_insert_range(self, where, first, last);
     return;
@@ -42,16 +47,30 @@ void __fastcall VectorInsertRangeHook(void* self, void* where, void* first, void
   char* last_c = reinterpret_cast<char*>(last);
 
   size_t distance = std::distance(first_c, last_c);
+  if (!s_callbackObserved.exchange(true)) {
+    LogS("DS3Hook", "First vector callback observed; distance=%zu", distance);
+  }
+
   if (distance == k_key_length) {
     std::string str(first_c, distance);
+    Log("[DS3Hook] Found %zu byte block, checking for retail key...", distance);
     if (str.find(k_retail_key) == 0) {
-      Log("Retail server address requested, patching to custom server address.");
+      Log("[DS3Hook] Retail server address requested, patching to custom server address.");
 
       std::wstring UnicodeHostname = WidenString(s_instance->ServerHostname());
 
-      memset(first_c, 0, k_block_length);
-      memcpy(first_c, s_instance->ServerPublicKey().c_str(), s_instance->ServerPublicKey().size() + 1);                         // +1 as we want the null terminator.
+      // Pass a copy of the replacement key to vector::insert. Keep the retail
+      // key in the source block so the next DLL generation can recognize it.
+      // The game reads the hostname after this callback, so it stays game-owned.
+      std::array<char, k_key_length> replacementKey{};
+      memcpy(replacementKey.data(), s_instance->ServerPublicKey().data(), s_instance->ServerPublicKey().size());
+      memset(first_c + k_hostname_offset, 0, k_block_length - k_hostname_offset);
       memcpy(first_c + k_hostname_offset, UnicodeHostname.c_str(), UnicodeHostname.size() * sizeof(wchar_t) + sizeof(wchar_t)); // +1 as we want the null terminator.
+      Log("[DS3Hook] Patched to hostname: %s", s_instance->ServerHostname().c_str());
+      s_original_vector_insert_range(self, where, replacementKey.data(), replacementKey.data() + replacementKey.size());
+      return;
+    } else {
+      VerboseS("DS3Hook", "Candidate block (%zu bytes) does not match retail key", distance);
     }
   }
 
@@ -62,38 +81,42 @@ void __fastcall VectorInsertRangeHook(void* self, void* where, void* first, void
 HookError DS3_ReplaceServerAddressHook::Install(const InjectorContext& context) {
   // Capture config values needed by the hook (called from detoured code).
   s_instance = this;
+  s_callbackObserved.store(false);
   ServerHostname() = context.Config.ServerHostname;
   ServerPublicKey() = context.Config.ServerPublicKey;
+  if (ServerPublicKey().size() > 426 || WidenString(ServerHostname()).size() >= 44)
+    return HookError::InvalidState;
+
+  Log("[DS3Hook] Installing hook, hostname=%s, pubkey_len=%zu", context.Config.ServerHostname.c_str(), context.Config.ServerPublicKey.size());
 
   // This matches std::vector::insert_range.
   std::vector<intptr_t> matches = context.SearchAOB({0x48, 0x89, 0x54, 0x24, 0x10, 0x48, 0x89, 0x4c, 0x24, 0x08, 0x53, 0x56, 0x57, 0x41, 0x54,
-                                                     0x41, 0x55, 0x41, 0x56, 0x41, 0x57, 0x48, 0x83, 0xec, 0x50, 0x48, 0xc7, 0x44, 0x24, 0x30,
-                                                     0xfe, 0xff, 0xff, 0xff, 0x4d, 0x8b, 0xf9, 0x4d, 0x8b, 0xe0, 0x48, 0x8b, 0xd9, 0x49, 0x8b,
-                                                     0xf9, 0x49, 0x2b, 0xf8, 0x0f, 0x84, 0x52, 0x01, 0x00, 0x00, 0x48, 0x8b, 0x71, 0x10, 0x4c,
-                                                     0x8b, 0x41, 0x08, 0x48, 0x8b, 0xc6, 0x49, 0x2b, 0xc0, 0x48, 0x3b, 0xc7});
+                                                      0x41, 0x55, 0x41, 0x56, 0x41, 0x57, 0x48, 0x83, 0xec, 0x50, 0x48, 0xc7, 0x44, 0x24, 0x30,
+                                                      0xfe, 0xff, 0xff, 0xff, 0x4d, 0x8b, 0xf9, 0x4d, 0x8b, 0xe0, 0x48, 0x8b, 0xd9, 0x49, 0x8b,
+                                                      0xf9, 0x49, 0x2b, 0xf8, 0x0f, 0x84, 0x52, 0x01, 0x00, 0x00, 0x48, 0x8b, 0x71, 0x10, 0x4c,
+                                                      0x8b, 0x41, 0x08, 0x48, 0x8b, 0xc6, 0x49, 0x2b, 0xc0, 0x48, 0x3b, 0xc7});
+
+  Log("[DS3Hook] AOB search found %zu matches", matches.size());
 
   if (matches.empty()) {
     Error("Failed to find injection point for modifying server address.");
     return HookError::NotFound;
   }
 
-  DetourTransactionBegin();
-  DetourUpdateThread(GetCurrentThread());
-  for (intptr_t func_ptr : matches) {
-    // We end up detouring all the functions back to a single instance of the function.
-    // As the functions are identical though, this makes no practical difference.
-    s_original_vector_insert_range = reinterpret_cast<vector_insert_range_p>(func_ptr);
-    DetourAttach(&(PVOID&)s_original_vector_insert_range, VectorInsertRangeHook);
-  }
-  LONG result = DetourTransactionCommit();
-
-  return (result == NO_ERROR) ? HookError::Success : HookError::DetourFailed;
+  // Use only the first match - detouring multiple identical template
+  // instantiations with a single callback is ambiguous.
+  s_original_vector_insert_range = reinterpret_cast<vector_insert_range_p>(matches.front());
+  Log("[DS3Hook] Attaching detour at 0x%p (first of %zu matches)", (void*)matches.front(), matches.size());
+  const LONG result = InjectorDetours::Attach(reinterpret_cast<void**>(&s_original_vector_insert_range), reinterpret_cast<void*>(VectorInsertRangeHook));
+  Log("[DS3Hook] Detour attach result: %ld", result);
+  return result == NO_ERROR ? HookError::Success : HookError::DetourFailed;
 }
 
-void DS3_ReplaceServerAddressHook::Uninstall() {
+bool DS3_ReplaceServerAddressHook::Uninstall() {
   if (s_instance == this) {
     s_instance = nullptr;
   }
+  return true;
 }
 
 const char* DS3_ReplaceServerAddressHook::GetName() {

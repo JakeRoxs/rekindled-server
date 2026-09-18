@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="using:Loader"
+        xmlns:savetools="using:Loader.Tools.SaveEditor"
         x:Class="Loader.MainWindow"
         Title="Rekindled Loader (Avalonia Preview)"
         Width="1100"
@@ -66,89 +67,97 @@
                 SelectionChanged="GameTabControl_OnSelectionChanged">
       <TabItem Header="Dark Souls II: SotFS" />
       <TabItem Header="Dark Souls III" />
+      <TabItem Header="Tools" />
     </TabControl>
 
-    <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" Margin="0,12,0,0">
-      <TextBlock Text="Game Executable" VerticalAlignment="Center" />
-      <TextBox x:Name="ExeLocationTextBox"
-               Grid.Column="1"
-               Classes="touch-target"
-               Watermark="Select game executable..." />
-      <Button x:Name="BrowseButton"
-              Grid.Column="2"
-              Classes="touch-target"
-              Content="Browse"
-              Click="BrowseButton_OnClick" />
+    <Grid x:Name="ServerListGrid" Grid.Row="1" RowDefinitions="Auto,Auto,*" Margin="0,12,0,0">
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <TextBlock Text="Game Executable" VerticalAlignment="Center" />
+        <TextBox x:Name="ExeLocationTextBox"
+                 Grid.Column="1"
+                 Classes="touch-target"
+                 Watermark="Select game executable..." />
+        <Button x:Name="BrowseButton"
+                Grid.Column="2"
+                Classes="touch-target"
+                Content="Browse"
+                Click="BrowseButton_OnClick" />
+      </Grid>
+
+      <Grid Grid.Row="1"
+            ColumnDefinitions="Auto,180,Auto,130,*,Auto,Auto"
+            ColumnSpacing="8"
+            Margin="0,12,0,12">
+        <TextBlock Text="Filter" VerticalAlignment="Center" />
+        <TextBox x:Name="FilterBox"
+                 Grid.Column="1"
+                 Classes="touch-target"
+                 TextChanged="FilterBox_OnTextChanged" />
+        <TextBlock Grid.Column="2" Text="Min Players" VerticalAlignment="Center" />
+        <NumericUpDown x:Name="MinimumPlayersBox"
+                       Grid.Column="3"
+                       Classes="touch-target"
+                       Minimum="0"
+                       Maximum="999"
+                       Value="1"
+                       ValueChanged="MinimumPlayersBox_OnValueChanged" />
+        <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+          <CheckBox x:Name="HidePasswordedBox"
+                    Classes="touch-target"
+                    Content="Hide Passworded"
+                    IsChecked="True"
+                    Click="HidePasswordedBox_OnClick" />
+          <CheckBox x:Name="UseSeparateSavesBox"
+                    Classes="touch-target"
+                    Content="Use Separate Saves"
+                    IsChecked="True"
+                    Click="UseSeparateSavesBox_OnClick" />
+        </StackPanel>
+        <ProgressBar x:Name="RefreshProgress"
+                     Grid.Column="5"
+                     Width="140"
+                     IsIndeterminate="True"
+                     IsVisible="False"
+                     VerticalAlignment="Center" />
+        <Button x:Name="RefreshButton"
+                Grid.Column="6"
+                Classes="touch-target"
+                Content="Refresh"
+                Click="RefreshButton_OnClick" />
+      </Grid>
+
+      <Border Grid.Row="2" BorderBrush="#555" BorderThickness="1" CornerRadius="8">
+        <ListBox x:Name="ServerListBox"
+                 ItemsSource="{Binding Servers}"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 SelectionChanged="ServerListBox_OnSelectionChanged">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="local:ServerConfig">
+              <Border Padding="14" MinHeight="64">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                  <StackPanel>
+                    <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Description}" Opacity="0.85" TextWrapping="Wrap" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                    <TextBlock Text="{Binding PlayerCount, StringFormat='Players: {0}'}" HorizontalAlignment="Right" />
+                    <TextBlock Text="{Binding GameType}" HorizontalAlignment="Right" Opacity="0.75" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
     </Grid>
 
-    <Grid Grid.Row="2"
-          ColumnDefinitions="Auto,180,Auto,130,*,Auto,Auto"
-          ColumnSpacing="8"
-          Margin="0,12,0,12">
-      <TextBlock Text="Filter" VerticalAlignment="Center" />
-      <TextBox x:Name="FilterBox"
-               Grid.Column="1"
-               Classes="touch-target"
-               TextChanged="FilterBox_OnTextChanged" />
-      <TextBlock Grid.Column="2" Text="Min Players" VerticalAlignment="Center" />
-      <NumericUpDown x:Name="MinimumPlayersBox"
-                     Grid.Column="3"
-                     Classes="touch-target"
-                     Minimum="0"
-                     Maximum="999"
-                     Value="1"
-                     ValueChanged="MinimumPlayersBox_OnValueChanged" />
-      <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-        <CheckBox x:Name="HidePasswordedBox"
-                  Classes="touch-target"
-                  Content="Hide Passworded"
-                  IsChecked="True"
-                  Click="HidePasswordedBox_OnClick" />
-        <CheckBox x:Name="UseSeparateSavesBox"
-                  Classes="touch-target"
-                  Content="Use Separate Saves"
-                  IsChecked="True"
-                  Click="UseSeparateSavesBox_OnClick" />
-      </StackPanel>
-      <ProgressBar x:Name="RefreshProgress"
-                   Grid.Column="5"
-                   Width="140"
-                   IsIndeterminate="True"
-                   IsVisible="False"
-                   VerticalAlignment="Center" />
-      <Button x:Name="RefreshButton"
-              Grid.Column="6"
-              Classes="touch-target"
-              Content="Refresh"
-              Click="RefreshButton_OnClick" />
-    </Grid>
+    <savetools:SaveEditorView x:Name="SaveEditor"
+                              Grid.Row="1"
+                              IsVisible="False"
+                              Margin="0,12,0,0" />
 
-    <Border Grid.Row="3" BorderBrush="#555" BorderThickness="1" CornerRadius="8">
-      <ListBox x:Name="ServerListBox"
-               ItemsSource="{Binding Servers}"
-               ScrollViewer.VerticalScrollBarVisibility="Auto"
-               SelectionChanged="ServerListBox_OnSelectionChanged">
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="local:ServerConfig">
-            <Border Padding="14" MinHeight="64">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <StackPanel>
-                  <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding Description}" Opacity="0.85" TextWrapping="Wrap" />
-                </StackPanel>
-
-                <StackPanel Grid.Column="1" HorizontalAlignment="Right">
-                  <TextBlock Text="{Binding PlayerCount, StringFormat='Players: {0}'}" HorizontalAlignment="Right" />
-                  <TextBlock Text="{Binding GameType}" HorizontalAlignment="Right" Opacity="0.75" />
-                </StackPanel>
-              </Grid>
-            </Border>
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
-    </Border>
-
-    <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="0,12,0,0" ColumnSpacing="8">
+    <Grid x:Name="FooterGrid" Grid.Row="4" ColumnDefinitions="*,Auto" Margin="0,12,0,0" ColumnSpacing="8">
       <StackPanel Spacing="2">
         <TextBlock x:Name="StatusText"
                    VerticalAlignment="Center"
