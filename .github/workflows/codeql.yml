@@ -86,7 +86,7 @@ jobs:
       - name: Compute cache key
         id: cachekey
         run: |
-          echo "SOURCE_HASH=${{ hashFiles('Source/**','Protobuf/**','CMakePresets.json','CMakeLists.txt','**/CMakeLists.txt','**/*.sln','**/*.csproj','vcpkg.json','vcpkg-toolchain.cmake','Tools/**','.github/actions/**','.github/workflows/codeql.yml') }}" >> $GITHUB_OUTPUT
+          echo "SOURCE_HASH=${{ hashFiles('Source/**','Protobuf/**','CMakePresets.json','CMakeLists.txt','**/CMakeLists.txt','**/*.sln','**/*.csproj','vcpkg.json','vcpkg-toolchain.cmake','tools/**','.github/actions/**','.github/workflows/codeql.yml') }}" >> $GITHUB_OUTPUT
 
       # Restore CodeQL database + trap caches. They are saved by the
       # "Save CodeQL database cache" step after the analyze step.

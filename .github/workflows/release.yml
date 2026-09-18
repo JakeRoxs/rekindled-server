@@ -61,7 +61,7 @@ jobs:
           LOADER_WINDOWS_RUNTIME: win-x64
         run: |
           cd "${{ github.workspace }}"
-          ./Tools/generate_package_windows.bat
+          ./tools/generate_package_windows.bat
 
       - name: Package Release (Linux)
         if: matrix.platform == 'linux'
@@ -72,7 +72,7 @@ jobs:
           LOADER_AVALONIA_LINUX_RUNTIME: linux-x64
         run: |
           cd "${{ github.workspace }}"
-          "${{ github.workspace }}/Tools/generate_package_linux.sh"
+          "${{ github.workspace }}/tools/generate_package_linux.sh"
 
       - name: Verify packaged files
         shell: bash
