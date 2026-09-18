@@ -67,12 +67,12 @@ namespace Loader.Tools.SaveEditor
 
         private static byte[] Decrypt(BinderFile file)
         {
-            return SFUtil.DecryptSL2File(file.Bytes, SFUtil.GetDS3SaveKey());
+            return SaveEncryption.DecryptSL2File(file.Bytes, SaveEncryption.GetDS3SaveKey());
         }
 
         private static byte[] Encrypt(byte[] bytes)
         {
-            return SFUtil.EncryptSL2File(bytes, SFUtil.GetDS3SaveKey());
+            return SaveEncryption.EncryptSL2File(bytes, SaveEncryption.GetDS3SaveKey());
         }
     }
 }
