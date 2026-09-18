@@ -1,0 +1,3 @@
+[submodule "Source/ThirdParty/SoulsFormats"]
+	path = Source/ThirdParty/SoulsFormats
+	url = https://github.com/JKAnderson/SoulsFormats.git
