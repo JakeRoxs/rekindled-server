@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace Loader.Tools.SaveEditor
 {
-    public class DS2Save
+    public class DarkSoulsSave
     {
         public string Path { get; }
 
@@ -19,7 +19,7 @@ namespace Loader.Tools.SaveEditor
         private byte[] Regulation { get; }
         private BND4 bnd;
 
-        public DS2Save(string path)
+        public DarkSoulsSave(string path)
         {
             Path = path;
             bnd = BND4.Read(path);

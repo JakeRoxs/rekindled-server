@@ -9,8 +9,8 @@ namespace Loader.Tools.SaveEditor
 {
     public partial class SaveEditorView : UserControl
     {
-        private DS2Save? _sourceSave;
-        private DS2Save? _destSave;
+        private DarkSoulsSave? _sourceSave;
+        private DarkSoulsSave? _destSave;
         private SaveSlot? _selectedSlot;
         private Border? _selectedSlotBorder;
         private bool _copyRight = true;
@@ -39,7 +39,7 @@ namespace Loader.Tools.SaveEditor
             {
                 try
                 {
-                    _sourceSave = new DS2Save(file.Path.LocalPath);
+                    _sourceSave = new DarkSoulsSave(file.Path.LocalPath);
                     SourcePathText.Text = file.Name;
                     RefreshSlots(SourceSlotsPanel, _sourceSave, isSource: true);
                 }
@@ -57,7 +57,7 @@ namespace Loader.Tools.SaveEditor
             {
                 try
                 {
-                    _destSave = new DS2Save(file.Path.LocalPath);
+                    _destSave = new DarkSoulsSave(file.Path.LocalPath);
                     DestPathText.Text = file.Name;
                     RefreshSlots(DestSlotsPanel, _destSave, isSource: false);
                 }
@@ -73,7 +73,7 @@ namespace Loader.Tools.SaveEditor
             if (_sourceSave == null) return;
             try
             {
-                DS2Save.Backup(_sourceSave.Path);
+                DarkSoulsSave.Backup(_sourceSave.Path);
                 _sourceSave.Write();
                 SourcePathText.Text = "Saved with backup.";
             }
@@ -88,7 +88,7 @@ namespace Loader.Tools.SaveEditor
             if (_destSave == null) return;
             try
             {
-                DS2Save.Backup(_destSave.Path);
+                DarkSoulsSave.Backup(_destSave.Path);
                 _destSave.Write();
                 DestPathText.Text = "Saved with backup.";
             }
@@ -122,7 +122,7 @@ namespace Loader.Tools.SaveEditor
             return files.FirstOrDefault();
         }
 
-        private void RefreshSlots(StackPanel panel, DS2Save save, bool isSource)
+        private void RefreshSlots(StackPanel panel, DarkSoulsSave save, bool isSource)
         {
             panel.Children.Clear();
             for (int i = 0; i < 10; i++)
@@ -226,7 +226,7 @@ namespace Loader.Tools.SaveEditor
             return card;
         }
 
-        private void LoadBankSlotToSave(SaveSlot slot, DS2Save? save, StackPanel panel, bool isSource)
+        private void LoadBankSlotToSave(SaveSlot slot, DarkSoulsSave? save, StackPanel panel, bool isSource)
         {
             if (save == null)
             {
@@ -276,7 +276,7 @@ namespace Loader.Tools.SaveEditor
         {
             if (_selectedSlot == null) return;
 
-            DS2Save? source, dest;
+            DarkSoulsSave? source, dest;
             StackPanel sourcePanel, destPanel;
             TextBlock destTextBlock;
 
