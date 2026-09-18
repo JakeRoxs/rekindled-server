@@ -46,7 +46,7 @@ let
 
         src = with fileset; toSource {
             root = ./.;
-            fileset = unions [ ./CMakeLists.txt ./Source ./Tools/Build ];
+            fileset = unions [ ./CMakeLists.txt ./Source ./tools/Build ];
         };
 
         nativeBuildInputs = [ cmake pkg-config removeReferencesTo xz ];

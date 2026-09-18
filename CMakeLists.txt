@@ -21,7 +21,7 @@ if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build configuration" FORCE)
 endif()
 
-# Native builds do not require the .NET SDK. Loaders use Tools/build.ps1 or dotnet.
+# Native builds do not require the .NET SDK. Loaders use tools/build.ps1 or dotnet.
 include(CTest)
 option(BUILD_SHARED_LIBS "Build third-party libraries as shared libraries" OFF)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>")

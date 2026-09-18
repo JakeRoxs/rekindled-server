@@ -3,9 +3,9 @@
 .SYNOPSIS
 Build native CMake targets and .NET loaders using the same entry point as CI.
 .EXAMPLE
-pwsh ./Tools/build.ps1 -Configuration Release -Test
+pwsh ./tools/build.ps1 -Configuration Release -Test
 .EXAMPLE
-pwsh ./Tools/build.ps1 -Component Native -Preset windows-vs2026-debug
+pwsh ./tools/build.ps1 -Component Native -Preset windows-vs2026-debug
 #>
 [CmdletBinding()]
 param(

@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-# Run from repo root (Tools/ is under repo root)
+# Run from repo root (tools/ is under repo root)
 cd "$(dirname "$0")/.." || exit 1
 
 # Use npx so users don't need to install prettier globally.

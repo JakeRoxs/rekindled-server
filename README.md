@@ -179,7 +179,7 @@ sudo apt install build-essential cmake ninja-build pkg-config libssl-dev libsqli
 From the repository root:
 
 ```powershell
-pwsh ./Tools/build.ps1 -Configuration Release
+pwsh ./tools/build.ps1 -Configuration Release
 ```
 
 Add `-Test` to run tests, use `-Configuration Debug` for a debug build, or select
@@ -202,8 +202,8 @@ external `proton-injector` helper and a Windows injector DLL.
 
 ## Packaging
 
-After a Release build, run `Tools/generate_package_windows.bat` on Windows or
-`bash Tools/generate_package_linux.sh` on Linux. Both assemble a release in
+After a Release build, run `tools/generate_package_windows.bat` on Windows or
+`bash tools/generate_package_linux.sh` on Linux. Both assemble a release in
 `rekindled-server/`.
 
 Packaging defaults to the `windows-release` or `linux-release` native preset.
@@ -227,7 +227,7 @@ The nix version stores the configs in `${XDG_CONFIG_HOME:-$HOME/.config}/rekindl
 
 ```
 /
-├── Protobuf/              Contains the protobuf definitions used by the server's network traffic. Compiling them is done via the bat file in Tools/
+├── Protobuf/              Contains the protobuf definitions used by the server's network traffic. Compiling them is done via the bat file in tools/
 ├── Resources/             General resources used for building and packaging - icons/readmes/etc.
 ├── Source/                All source code for the project.
 │   ├── Injector/          This is the DLL that gets injected into the game to provide Rekindled Server's functionality.
@@ -239,7 +239,7 @@ The nix version stores the configs in `${XDG_CONFIG_HOME:-$HOME/.config}/rekindl
 │   ├── Shared/            Source code that is shared between the server and injector projects.
 │   └── ThirdParty/        Source code for any remaining third-party libraries used.
 │   └── WebUI/             Contains the static resources used to assemble the management web page for the server.
-├── Tools/                 Various cheat engine tables, bat files and alike used for analysis.
+├── tools/                 Various cheat engine tables, bat files and alike used for analysis.
 ```
 
 # How can I help?

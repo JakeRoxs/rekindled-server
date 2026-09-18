@@ -19,10 +19,10 @@
 !Source/ThirdParty/**/*.dll
 !Source/ThirdParty/**.so
 !Source/ThirdParty/**/*.so
-!Tools/**.dll
-!Tools/**/*.dll
-!Tools/**.so
-!Tools/**/*.so
+!tools/**.dll
+!tools/**/*.dll
+!tools/**.so
+!tools/**/*.so
 
 # Fortran module files
 *.mod
@@ -37,10 +37,10 @@
 !Source/ThirdParty/**/*.lib
 !Source/ThirdParty/**.a
 !Source/ThirdParty/**/*.a
-!Tools/**.lib
-!Tools/**/*.lib
-!Tools/**.a
-!Tools/**/*.a
+!tools/**.lib
+!tools/**/*.lib
+!tools/**.a
+!tools/**/*.a
 
 # Executables
 *.exe
@@ -49,8 +49,8 @@
 !Source/ThirdParty/**.exe
 !Source/ThirdParty/**/*.exe
 !Resources/Prerequisites/*.exe
-!Tools/**.exe
-!Tools/**/*.exe
+!tools/**.exe
+!tools/**/*.exe
 
 Debug/
 /Bin/
@@ -72,9 +72,9 @@ node_modules/
 # JS test coverage artifacts (c8/nyc)
 coverage/
 .nyc_output/
-Tools/Utilities/ScyllaHide/
-Tools/Utilities/ServerAddressFinder/
-Tools/Deploy/
+tools/Utilities/ScyllaHide/
+tools/Utilities/ServerAddressFinder/
+tools/Deploy/
 
 # Python bytecode
 __pycache__/
