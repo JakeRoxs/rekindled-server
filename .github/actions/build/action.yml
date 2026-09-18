@@ -64,4 +64,4 @@ runs:
         BUILD_COMPONENT: ${{ inputs.component }}
         BUILD_TEST: ${{ inputs.test }}
       run: |
-        ./Tools/build.ps1 -Preset $env:BUILD_PRESET -Configuration $env:BUILD_CONFIGURATION -Component $env:BUILD_COMPONENT -Test:($env:BUILD_TEST -eq 'true')
+        ./tools/build.ps1 -Preset $env:BUILD_PRESET -Configuration $env:BUILD_CONFIGURATION -Component $env:BUILD_COMPONENT -Test:($env:BUILD_TEST -eq 'true')
