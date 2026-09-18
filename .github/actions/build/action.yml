@@ -64,9 +64,17 @@ runs:
                 New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
             }
             echo "SCCACHE_DIR=$cacheDir" >> $env:GITHUB_ENV
+            echo "CMAKE_COMPILER_LAUNCHER=-DCMAKE_C_COMPILER_LAUNCHER=$sccache -DCMAKE_CXX_COMPILER_LAUNCHER=$sccache" >> $env:GITHUB_ENV
         } else {
             Write-Warning "sccache not found, proceeding without compiler cache"
         }
+
+    - name: Setup ccache (Linux)
+      if: runner.os == 'Linux' && inputs.component != 'Managed'
+      shell: bash
+      run: |
+        echo "CCACHE=$(which ccache)" >> $GITHUB_ENV
+        echo "CMAKE_COMPILER_LAUNCHER=-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV
 
     - name: Cache ccache/sccache database
       if: inputs.component != 'Managed'
@@ -122,12 +130,11 @@ runs:
         BUILD_CONFIGURATION: ${{ inputs.configuration }}
         BUILD_COMPONENT: ${{ inputs.component }}
         BUILD_TEST: ${{ inputs.test }}
-        CMAKE_C_COMPILER_LAUNCHER: ccache
-        CMAKE_CXX_COMPILER_LAUNCHER: ccache
       run: |
-        if ($env:SCCACHE) {
-            $env:CMAKE_C_COMPILER_LAUNCHER = $env:SCCACHE
-            $env:CMAKE_CXX_COMPILER_LAUNCHER = $env:SCCACHE
-            Write-Host "Using sccache for compilation"
+        $cmakeArgs = @()
+        if ($env:CMAKE_COMPILER_LAUNCHER) {
+            Write-Host "Using compiler launcher: $env:CMAKE_COMPILER_LAUNCHER"
+            $parts = $env:CMAKE_COMPILER_LAUNCHER -split ' '
+            $cmakeArgs = $parts
         }
-        ./tools/build.ps1 -Preset $env:BUILD_PRESET -Configuration $env:BUILD_CONFIGURATION -Component $env:BUILD_COMPONENT -Test:($env:BUILD_TEST -eq 'true')
+        ./tools/build.ps1 -Preset $env:BUILD_PRESET -Configuration $env:BUILD_CONFIGURATION -Component $env:BUILD_COMPONENT -Test:($env:BUILD_TEST -eq 'true') -CMakeArgs $cmakeArgs
