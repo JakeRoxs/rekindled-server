@@ -22,6 +22,63 @@ runs:
       with:
         dotnet-version: "10.0.x"
 
+    - name: Install native dependencies (Linux)
+      if: runner.os == 'Linux' && inputs.component != 'Managed'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake ninja-build libssl-dev zlib1g-dev libsqlite3-dev pkg-config uuid-dev ccache
+
+    - name: Setup sccache (Windows)
+      if: runner.os == 'Windows' && inputs.component != 'Managed'
+      shell: pwsh
+      run: |
+        Write-Host "Setting up sccache for Windows"
+        # Find sccache in Visual Studio installation
+        $vsInstallers = @("Enterprise", "Professional", "Community")
+        $sccache = $null
+        foreach ($installer in $vsInstallers) {
+            $path = "C:\Program Files (x86)\Microsoft Visual Studio\2022\$installer\Common7\IDE\CommonExtensions\Microsoft\CMake\sccache\sccache.exe"
+            if (Test-Path -LiteralPath $path) {
+                $sccache = $path
+                break
+            }
+        }
+        # VS2026 path
+        if (-not $sccache) {
+            foreach ($installer in $vsInstallers) {
+                $path = "C:\Program Files (x86)\Microsoft Visual Studio\2026\$installer\Common7\IDE\CommonExtensions\Microsoft\CMake\sccache\sccache.exe"
+                if (Test-Path -LiteralPath $path) {
+                    $sccache = $path
+                    break
+                }
+            }
+        }
+        if ($sccache) {
+            & $sccache --start-server
+            Write-Host "Found sccache at: $sccache"
+            echo "SCCACHE=$sccache" >> $env:GITHUB_ENV
+            # Set cache directory to a consistent location for GitHub Actions caching
+            $cacheDir = Join-Path $env:HOME ".cache\sccache"
+            if (-not (Test-Path -LiteralPath $cacheDir)) {
+                New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+            }
+            echo "SCCACHE_DIR=$cacheDir" >> $env:GITHUB_ENV
+        } else {
+            Write-Warning "sccache not found, proceeding without compiler cache"
+        }
+
+    - name: Cache ccache/sccache database
+      if: inputs.component != 'Managed'
+      uses: actions/cache@v6
+      with:
+        path: |
+          ~/.cache/ccache
+          ~/.cache/sccache
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h', '**/*.hpp', 'CMakeLists.txt', 'CMakePresets.json') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
     - name: Cache NuGet packages
       if: inputs.component != 'Native'
       uses: actions/cache@v6
@@ -30,13 +87,6 @@ runs:
         key: ${{ runner.os }}-nuget-ci-${{ hashFiles('**/*.csproj', '**/Directory.Packages.props', '**/packages.lock.json', '**/NuGet.Config', '**/nuget.config', '**/global.json') }}
         restore-keys: |
           ${{ runner.os }}-nuget-ci-
-
-    - name: Install native dependencies (Linux)
-      if: runner.os == 'Linux' && inputs.component != 'Managed'
-      shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y build-essential cmake ninja-build libssl-dev zlib1g-dev libsqlite3-dev pkg-config uuid-dev
 
     - name: Cache vcpkg binary cache
       uses: actions/cache@v6
@@ -54,6 +104,15 @@ runs:
       if: runner.os == 'Windows'
       shell: pwsh
       run: |
+        # Check if vcpkg dependencies are already installed from cache
+        $installedDir = Join-Path (Get-Location) "vcpkg_installed"
+        if (Test-Path -LiteralPath $installedDir) {
+            $packages = Get-ChildItem -LiteralPath (Join-Path $installedDir "x64-windows") -Directory -ErrorAction SilentlyContinue
+            if ($packages.Count -gt 0) {
+                Write-Host "vcpkg dependencies found in cache, skipping install"
+                exit 0
+            }
+        }
         & "$env:VCPKG_ROOT/vcpkg.exe" install
 
     - name: Build and test
@@ -63,5 +122,12 @@ runs:
         BUILD_CONFIGURATION: ${{ inputs.configuration }}
         BUILD_COMPONENT: ${{ inputs.component }}
         BUILD_TEST: ${{ inputs.test }}
+        CMAKE_C_COMPILER_LAUNCHER: ccache
+        CMAKE_CXX_COMPILER_LAUNCHER: ccache
       run: |
+        if ($env:SCCACHE) {
+            $env:CMAKE_C_COMPILER_LAUNCHER = $env:SCCACHE
+            $env:CMAKE_CXX_COMPILER_LAUNCHER = $env:SCCACHE
+            Write-Host "Using sccache for compilation"
+        }
         ./tools/build.ps1 -Preset $env:BUILD_PRESET -Configuration $env:BUILD_CONFIGURATION -Component $env:BUILD_COMPONENT -Test:($env:BUILD_TEST -eq 'true')
