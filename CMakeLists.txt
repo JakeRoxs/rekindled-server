@@ -30,7 +30,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/$<CONFIG>")
 set(CMAKE_PDB_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/$<CONFIG>")
 
 add_subdirectory(Source)
-add_subdirectory(tools)
+add_subdirectory(Tools)
 
 
 
