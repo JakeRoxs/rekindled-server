@@ -80,6 +80,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          submodules: recursive
 
       # Compute a stable cache key from source + build-system files (including this workflow).
       # Reused by all cache steps so the hash is computed once per job.
