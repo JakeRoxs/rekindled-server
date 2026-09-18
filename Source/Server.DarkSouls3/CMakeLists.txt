@@ -102,8 +102,11 @@ endif()
 # always define the game-specific flag regardless of platform
 target_compile_definitions(${PROJECT_NAME} PRIVATE BUILD_DARKSOULS3)
 
+# Game managers call back into Server_lib, which also depends on this archive.
+# Declare both directions so CMake repeats the static libraries for GNU ld.
 target_link_libraries(
     ${PROJECT_NAME}
+    Server_lib
     Shared
     httplib
     libprotobuf-lite

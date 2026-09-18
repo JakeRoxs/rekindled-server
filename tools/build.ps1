@@ -11,7 +11,7 @@ pwsh ./tools/build.ps1 -Component Native -Preset windows-vs2026-debug
 param(
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
     [ValidateSet('All', 'Native', 'Managed')][string]$Component = 'All',
-    [ValidateSet('windows-debug', 'windows-release', 'windows-vs2026-debug', 'windows-vs2026-release', 'linux-debug', 'linux-release')]
+    [ValidateSet('windows-debug', 'windows-release', 'windows-vs2026-debug', 'windows-vs2026-release', 'windows-ninja-release', 'linux-debug', 'linux-release')]
     [string]$Preset,
     [ValidateRange(1, 1024)][int]$Jobs = [Environment]::ProcessorCount,
     [string[]]$CMakeArgs = @(),

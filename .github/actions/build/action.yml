@@ -13,6 +13,9 @@ inputs:
   test:
     description: Run native and managed tests after building
     default: "true"
+  compiler-cache:
+    description: Cache native compilation (disable for traced CodeQL builds)
+    default: "true"
 runs:
   using: composite
   steps:
@@ -29,63 +32,38 @@ runs:
         sudo apt-get update
         sudo apt-get install -y build-essential cmake ninja-build libssl-dev zlib1g-dev libsqlite3-dev pkg-config uuid-dev ccache
 
-    - name: Setup sccache (Windows)
+    - name: Setup MSVC environment (Windows)
       if: runner.os == 'Windows' && inputs.component != 'Managed'
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: Configure compiler cache location
+      if: inputs.component != 'Managed' && inputs.compiler-cache == 'true'
       shell: pwsh
       run: |
-        Write-Host "Setting up sccache for Windows"
-        # Find sccache in Visual Studio installation
-        $vsInstallers = @("Enterprise", "Professional", "Community")
-        $sccache = $null
-        foreach ($installer in $vsInstallers) {
-            $path = "C:\Program Files (x86)\Microsoft Visual Studio\2022\$installer\Common7\IDE\CommonExtensions\Microsoft\CMake\sccache\sccache.exe"
-            if (Test-Path -LiteralPath $path) {
-                $sccache = $path
-                break
-            }
-        }
-        # VS2026 path
-        if (-not $sccache) {
-            foreach ($installer in $vsInstallers) {
-                $path = "C:\Program Files (x86)\Microsoft Visual Studio\2026\$installer\Common7\IDE\CommonExtensions\Microsoft\CMake\sccache\sccache.exe"
-                if (Test-Path -LiteralPath $path) {
-                    $sccache = $path
-                    break
-                }
-            }
-        }
-        if ($sccache) {
-            & $sccache --start-server
-            Write-Host "Found sccache at: $sccache"
-            echo "SCCACHE=$sccache" >> $env:GITHUB_ENV
-            # Set cache directory to a consistent location for GitHub Actions caching
-            $cacheDir = Join-Path $env:HOME ".cache\sccache"
-            if (-not (Test-Path -LiteralPath $cacheDir)) {
-                New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
-            }
-            echo "SCCACHE_DIR=$cacheDir" >> $env:GITHUB_ENV
-            echo "CMAKE_COMPILER_LAUNCHER=-DCMAKE_C_COMPILER_LAUNCHER=$sccache -DCMAKE_CXX_COMPILER_LAUNCHER=$sccache" >> $env:GITHUB_ENV
-        } else {
-            Write-Warning "sccache not found, proceeding without compiler cache"
-        }
+        $cacheDir = Join-Path $env:RUNNER_TEMP 'compiler-cache'
+        New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+        "CCACHE_DIR=$cacheDir" >> $env:GITHUB_ENV
+        "SCCACHE_DIR=$cacheDir" >> $env:GITHUB_ENV
+        "CCACHE_MAXSIZE=2G" >> $env:GITHUB_ENV
+        "SCCACHE_CACHE_SIZE=2G" >> $env:GITHUB_ENV
 
-    - name: Setup ccache (Linux)
-      if: runner.os == 'Linux' && inputs.component != 'Managed'
-      shell: bash
-      run: |
-        echo "CCACHE=$(which ccache)" >> $GITHUB_ENV
-        echo "CMAKE_COMPILER_LAUNCHER=-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache" >> $GITHUB_ENV
-
-    - name: Cache ccache/sccache database
-      if: inputs.component != 'Managed'
-      uses: actions/cache@v6
+    - name: Restore compiler cache
+      if: inputs.component != 'Managed' && inputs.compiler-cache == 'true'
+      id: compiler-cache
+      uses: actions/cache/restore@v6
       with:
-        path: |
-          ~/.cache/ccache
-          ~/.cache/sccache
-        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h', '**/*.hpp', 'CMakeLists.txt', 'CMakePresets.json') }}
+        path: ${{ runner.temp }}/compiler-cache
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ inputs.preset }}-compiler-v2-${{ github.sha }}-${{ github.run_attempt }}
         restore-keys: |
-          ${{ runner.os }}-ccache-
+          ${{ runner.os }}-${{ runner.arch }}-${{ inputs.preset }}-compiler-v2-
+
+    - name: Install sccache (Windows)
+      if: runner.os == 'Windows' && inputs.component != 'Managed' && inputs.compiler-cache == 'true'
+      uses: mozilla-actions/sccache-action@v0.0.11
+      with:
+        version: v0.18.0
 
     - name: Cache NuGet packages
       if: inputs.component != 'Native'
@@ -96,32 +74,45 @@ runs:
         restore-keys: |
           ${{ runner.os }}-nuget-ci-
 
-    - name: Cache vcpkg binary cache
-      uses: actions/cache@v6
-      with:
-        path: ~/.cache/vcpkg/archives
-        key: ${{ runner.os }}-vcpkg-${{ hashFiles('vcpkg.json') }}
-        restore-keys: |
-          ${{ runner.os }}-vcpkg-
-
     - name: Bootstrap vcpkg
-      if: runner.os == 'Windows'
+      if: runner.os == 'Windows' && inputs.component != 'Managed'
       uses: lukka/run-vcpkg@v11
 
-    - name: Install vcpkg dependencies
-      if: runner.os == 'Windows'
+    # run-vcpkg exports the removed x-gha backend. Override it after bootstrap.
+    - name: Configure vcpkg binary cache
+      if: runner.os == 'Windows' && inputs.component != 'Managed'
       shell: pwsh
       run: |
-        # Check if vcpkg dependencies are already installed from cache
-        $installedDir = Join-Path (Get-Location) "vcpkg_installed"
-        if (Test-Path -LiteralPath $installedDir) {
-            $packages = Get-ChildItem -LiteralPath (Join-Path $installedDir "x64-windows") -Directory -ErrorAction SilentlyContinue
-            if ($packages.Count -gt 0) {
-                Write-Host "vcpkg dependencies found in cache, skipping install"
-                exit 0
-            }
-        }
-        & "$env:VCPKG_ROOT/vcpkg.exe" install
+        $cacheDir = Join-Path $env:RUNNER_TEMP 'vcpkg-archives'
+        New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
+        "VCPKG_BINARY_SOURCES=clear;files,$cacheDir,readwrite" >> $env:GITHUB_ENV
+
+    - name: Restore vcpkg binary cache
+      if: runner.os == 'Windows' && inputs.component != 'Managed'
+      id: vcpkg-cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ runner.temp }}/vcpkg-archives
+        key: ${{ runner.os }}-${{ runner.arch }}-vcpkg-v2-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'triplets/**') }}-${{ github.sha }}-${{ github.run_attempt }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-vcpkg-v2-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'triplets/**') }}-
+          ${{ runner.os }}-${{ runner.arch }}-vcpkg-v2-
+
+    - name: Install vcpkg dependencies
+      if: runner.os == 'Windows' && inputs.component != 'Managed'
+      shell: pwsh
+      run: |
+        # Always validate the manifest and ABI, even when a cache was restored.
+        & "$env:VCPKG_ROOT/vcpkg.exe" install --triplet x64-windows --x-install-root="$env:GITHUB_WORKSPACE/vcpkg_installed"
+        if ($LASTEXITCODE -ne 0) { throw "vcpkg install failed: $LASTEXITCODE" }
+
+    # Preserve dependency builds even if a later compile or test fails.
+    - name: Save vcpkg binary cache
+      if: runner.os == 'Windows' && inputs.component != 'Managed' && steps.vcpkg-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ runner.temp }}/vcpkg-archives
+        key: ${{ steps.vcpkg-cache.outputs.cache-primary-key }}
 
     - name: Build and test
       shell: pwsh
@@ -130,11 +121,34 @@ runs:
         BUILD_CONFIGURATION: ${{ inputs.configuration }}
         BUILD_COMPONENT: ${{ inputs.component }}
         BUILD_TEST: ${{ inputs.test }}
+        BUILD_COMPILER_CACHE: ${{ inputs.compiler-cache }}
       run: |
         $cmakeArgs = @()
-        if ($env:CMAKE_COMPILER_LAUNCHER) {
-            Write-Host "Using compiler launcher: $env:CMAKE_COMPILER_LAUNCHER"
-            $parts = $env:CMAKE_COMPILER_LAUNCHER -split ' '
-            $cmakeArgs = $parts
+        if ($env:BUILD_COMPONENT -ne 'Managed') {
+            $launcher = ''
+            if ($env:BUILD_COMPILER_CACHE -eq 'true') {
+                $launcher = if ($IsWindows) { $env:SCCACHE_PATH } else { (Get-Command ccache -ErrorAction Stop).Source }
+                if (-not $launcher) { throw 'Compiler cache executable was not configured.' }
+            }
+            # Keep paths containing spaces as individual arguments.
+            # Empty values also clear launchers in restored CodeQL build trees.
+            $cmakeArgs = @("-DCMAKE_C_COMPILER_LAUNCHER=$launcher", "-DCMAKE_CXX_COMPILER_LAUNCHER=$launcher")
         }
         ./tools/build.ps1 -Preset $env:BUILD_PRESET -Configuration $env:BUILD_CONFIGURATION -Component $env:BUILD_COMPONENT -Test:($env:BUILD_TEST -eq 'true') -CMakeArgs $cmakeArgs
+
+    - name: Compiler cache statistics
+      if: always() && inputs.component != 'Managed' && inputs.compiler-cache == 'true'
+      shell: pwsh
+      run: |
+        if ($IsWindows -and $env:SCCACHE_PATH) {
+            & $env:SCCACHE_PATH --show-stats
+        } elseif (Get-Command ccache -ErrorAction SilentlyContinue) {
+            ccache --show-stats
+        }
+
+    - name: Save compiler cache
+      if: always() && !cancelled() && inputs.component != 'Managed' && inputs.compiler-cache == 'true' && steps.compiler-cache.outcome == 'success' && steps.compiler-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ runner.temp }}/compiler-cache
+        key: ${{ steps.compiler-cache.outputs.cache-primary-key }}

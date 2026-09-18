@@ -78,9 +78,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Keep the hosted Visual Studio version aligned with the CMake preset.
+          # Ninja uses MSVC from the runner and supports the sccache launcher.
           - os: windows-2025-vs2026
-            preset: windows-vs2026-release
+            preset: windows-ninja-release
           - os: ubuntu-latest
             preset: linux-release
     steps:

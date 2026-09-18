@@ -164,6 +164,8 @@ jobs:
           preset: linux-release
           component: Native
           test: "false"
+          # CodeQL must observe compiler invocations to extract the source.
+          compiler-cache: "false"
 
       - name: Run manual C# build steps
         if: matrix.language == 'csharp' && matrix.build-mode == 'manual'
