@@ -16,4 +16,4 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/../.."
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE Server_lib Shared DarkSouls3 steam libprotobuf-lite)
+target_link_libraries(${PROJECT_NAME} PRIVATE DarkSouls3 Server_lib Shared steam libprotobuf-lite)

@@ -95,7 +95,7 @@ SET(LIB_SOURCES
 add_library(${PROJECT_NAME}_lib STATIC ${LIB_SOURCES} ${PLATFORM_SOURCES})
 
 add_executable(${PROJECT_NAME} Entry.cpp)
-target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_lib)
+target_link_libraries(${PROJECT_NAME} PRIVATE DarkSouls3 DarkSouls2 ${PROJECT_NAME}_lib)
 
 # Standalone client emulator executable
 add_subdirectory(ClientEmu)
@@ -239,9 +239,9 @@ if(BUILD_TESTING)
     )
 
     target_link_libraries(ServerClientSessionTests PRIVATE
+        DarkSouls3
         Server_lib
         Shared
-        DarkSouls3
         steam
         libprotobuf-lite
     )
