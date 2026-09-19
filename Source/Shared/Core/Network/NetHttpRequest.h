@@ -15,6 +15,7 @@
 #include <vector>
 #include <thread>
 #include <atomic>
+#include <cstdint>
 
 #ifdef _WIN32
 #include <winsock2.h>

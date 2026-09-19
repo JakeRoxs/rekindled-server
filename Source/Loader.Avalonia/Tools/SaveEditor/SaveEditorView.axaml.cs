@@ -5,7 +5,9 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Loader.Tools.SaveEditor
@@ -35,6 +37,68 @@ namespace Loader.Tools.SaveEditor
             }
         }
 
+        private class BankSlotDto
+        {
+            public string CharName { get; set; } = "";
+            public int SoulLevel { get; set; }
+            public int PlaytimeSeconds { get; set; }
+            public string MenuData { get; set; } = "";
+            public string SlotData { get; set; } = "";
+        }
+
+        private static readonly string BankPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "RekindledServer",
+            "save-editor-bank.json");
+
+        private void LoadBank()
+        {
+            if (!File.Exists(BankPath)) return;
+
+            try
+            {
+                var dtos = JsonSerializer.Deserialize<List<BankSlotDto>>(File.ReadAllText(BankPath));
+                if (dtos == null) return;
+
+                foreach (var dto in dtos)
+                {
+                    try
+                    {
+                        var menuData = Convert.FromBase64String(dto.MenuData);
+                        var slotData = Convert.FromBase64String(dto.SlotData);
+                        var slot = new SaveSlot(menuData, slotData);
+                        var card = CreateBankCard(slot, dtos.IndexOf(dto));
+                        BankPanel.Children.Add(card);
+                        _bank.Add(new BankEntry(slot, card, dtos.IndexOf(dto)));
+                    }
+                    catch { /* Skip invalid entries */ }
+                }
+            }
+            catch { /* Reset to empty if file is corrupted */ }
+        }
+
+        private void SaveBank()
+        {
+            try
+            {
+                var directory = Path.GetDirectoryName(BankPath);
+                if (!string.IsNullOrWhiteSpace(directory))
+                    Directory.CreateDirectory(directory);
+
+                var dtos = _bank.Select(e => new BankSlotDto
+                {
+                    CharName = e.Slot.CharName,
+                    SoulLevel = e.Slot.SoulLevel,
+                    PlaytimeSeconds = e.Slot.PlaytimeSeconds,
+                    MenuData = Convert.ToBase64String(e.Slot.MenuData),
+                    SlotData = Convert.ToBase64String(e.Slot.SlotData)
+                }).ToList();
+
+                File.WriteAllText(BankPath, JsonSerializer.Serialize(dtos, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch { /* Ignore save errors */ }
+        }
+
         public SaveEditorView()
         {
             InitializeComponent();
@@ -42,6 +106,7 @@ namespace Loader.Tools.SaveEditor
             DragDrop.AddDropHandler(SourceDropPanel, SourcePanel_Drop);
             DragDrop.AddDragOverHandler(DestDropPanel, DestPanel_DragOver);
             DragDrop.AddDropHandler(DestDropPanel, DestPanel_Drop);
+            LoadBank();
         }
 
         private async void SourceLoadButton_OnClick(object? sender, RoutedEventArgs e)
@@ -304,6 +369,7 @@ namespace Loader.Tools.SaveEditor
             var card = CreateBankCard(slot, slotIndex);
             BankPanel.Children.Add(card);
             _bank.Add(new BankEntry(slot, card, slotIndex));
+            SaveBank();
         }
 
         private Border CreateBankCard(SaveSlot slot, int slotIndex)
@@ -357,6 +423,7 @@ namespace Loader.Tools.SaveEditor
         {
             BankPanel.Children.Remove(card);
             _bank.RemoveAll(entry => entry.Card == card);
+            SaveBank();
         }
 
         private void LoadBankSlotToSave(SaveSlot slot, DarkSoulsSave? save, StackPanel panel, bool isSource)
@@ -403,6 +470,7 @@ namespace Loader.Tools.SaveEditor
         {
             BankPanel.Children.Clear();
             _bank.Clear();
+            SaveBank();
         }
 
         private void CopyRightButton_OnClick(object? sender, RoutedEventArgs e)
@@ -612,6 +680,7 @@ namespace Loader.Tools.SaveEditor
                 {
                     BankPanel.Children.Remove(entry.Card);
                     _bank.Remove(entry);
+                    SaveBank();
                 }
             }
             else if (_destSave != null)
@@ -662,6 +731,7 @@ namespace Loader.Tools.SaveEditor
                 {
                     BankPanel.Children.Remove(entry.Card);
                     _bank.Remove(entry);
+                    SaveBank();
                 }
             }
             else if (_sourceSave != null)

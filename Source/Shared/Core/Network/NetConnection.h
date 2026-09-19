@@ -13,6 +13,7 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <cstdint>
 
 #if __linux__
 #include <unistd.h>

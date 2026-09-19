@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <cstdint>
 
 // Portable wrapper for GCC/Clang's printf-style checking attribute.
 // On GNU compilers FORMAT_PRINTF(a,b) expands to
