@@ -14,6 +14,8 @@
 #include "Server/Streams/Frpg2ReliableUdpPacket.h"
 
 #include <unordered_set>
+#include <limits>
+#include <cstdint>
 
 struct Frpg2ReliableUdpPacket;
 class RSAKeyPair;
@@ -162,9 +164,9 @@ protected:
 
 #ifdef _DEBUG
   // Makes debugging easier.
-  const uint32_t RETRANSMIT_MAX_ATTEMPTS = std::numeric_limits<uint32_t>::max();
+  static constexpr uint32_t RETRANSMIT_MAX_ATTEMPTS = 4294967295; // UINT32_MAX
 #else
-  const uint32_t RETRANSMIT_MAX_ATTEMPTS = 160; // 160 * 0.2 = Will give up after trying to retransmiting for 30 seconds
+  static constexpr uint32_t RETRANSMIT_MAX_ATTEMPTS = 160; // 160 * 0.2 = Will give up after trying to retransmiting for 30 seconds
 #endif
 
   const float RESEND_SYN_INTERVAL = 0.5f;

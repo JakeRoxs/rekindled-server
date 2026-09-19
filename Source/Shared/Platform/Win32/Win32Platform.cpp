@@ -107,7 +107,8 @@ bool PlatformInit() {
   return true;
 }
 
-static FILE* g_LogFile = nullptr;
+static std::mutex g_LogFileMutex;
+static std::unique_ptr<FILE, decltype(&fclose)> g_LogFile(nullptr, &fclose);
 
 bool PlatformTerm() {
   if (int Result = WSACleanup(); Result != 0) {
@@ -115,9 +116,9 @@ bool PlatformTerm() {
     return false;
   }
 
-  if (g_LogFile) {
-    fclose(g_LogFile);
-    g_LogFile = nullptr;
+  {
+    std::lock_guard<std::mutex> logLock(g_LogFileMutex);
+    g_LogFile.reset();
   }
 
   UnloadSymbols();
@@ -150,18 +151,22 @@ void WriteToConsole(ConsoleColor Color, const char* Message) {
   }
 
   // Fallback log file path (temporary directory).
+  // An explicit sink already persists this record, even with no console.
+  if (HasLogSink())
+    return;
+  std::lock_guard<std::mutex> logLock(g_LogFileMutex);
   if (!g_LogFile) {
     char tempPath[MAX_PATH];
     if (GetTempPathA(MAX_PATH, tempPath) > 0) {
       char logPath[MAX_PATH];
       snprintf(logPath, MAX_PATH, "%srekindled_injector.log", tempPath);
-      g_LogFile = fopen(logPath, "a");
+      g_LogFile.reset(fopen(logPath, "a"));
     }
   }
 
   if (g_LogFile) {
-    fprintf(g_LogFile, "%s", Message);
-    fflush(g_LogFile);
+    fprintf(g_LogFile.get(), "%s", Message);
+    fflush(g_LogFile.get());
   }
 }
 

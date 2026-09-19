@@ -3,15 +3,15 @@
 .SYNOPSIS
 Build native CMake targets and .NET loaders using the same entry point as CI.
 .EXAMPLE
-pwsh ./Tools/build.ps1 -Configuration Release -Test
+pwsh ./tools/build.ps1 -Configuration Release -Test
 .EXAMPLE
-pwsh ./Tools/build.ps1 -Component Native -Preset windows-vs2026-debug
+pwsh ./tools/build.ps1 -Component Native -Preset windows-vs2026-debug
 #>
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
     [ValidateSet('All', 'Native', 'Managed')][string]$Component = 'All',
-    [ValidateSet('windows-debug', 'windows-release', 'windows-vs2026-debug', 'windows-vs2026-release', 'linux-debug', 'linux-release')]
+    [ValidateSet('windows-debug', 'windows-release', 'windows-vs2026-debug', 'windows-vs2026-release', 'windows-ninja-release', 'linux-debug', 'linux-release')]
     [string]$Preset,
     [ValidateRange(1, 1024)][int]$Jobs = [Environment]::ProcessorCount,
     [string[]]$CMakeArgs = @(),

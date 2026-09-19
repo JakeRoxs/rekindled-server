@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
@@ -583,7 +584,22 @@ namespace Loader
         return;
       }
 
-      UpdateGameTypeFromTabSelection();
+      int selectedIndex = GameTabControl.SelectedIndex;
+      if (selectedIndex == 2)
+      {
+        // Tools tab
+        ServerListGrid.IsVisible = false;
+        SaveEditor.IsVisible = true;
+        FooterGrid.IsVisible = false;
+      }
+      else
+      {
+        // Game tabs
+        ServerListGrid.IsVisible = true;
+        SaveEditor.IsVisible = false;
+        FooterGrid.IsVisible = true;
+        UpdateGameTypeFromTabSelection();
+      }
     }
 
     private async void CopyHostButton_OnClick(object? sender, RoutedEventArgs e)

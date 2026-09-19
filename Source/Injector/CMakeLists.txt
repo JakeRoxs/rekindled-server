@@ -16,6 +16,10 @@ set(INJECTOR_CORE_SOURCES
     ShutdownSignal.cpp
     HookManager.h
     HookManager.cpp
+    DetourLifetime.h
+    DetourLifetime.cpp
+    InjectorLog.h
+    InjectorLog.cpp
     Hooks/Hook.h
     Hooks/Hook.cpp
     Hooks/DarkSouls3/DS3_ReplaceServerAddressHook.h
@@ -32,7 +36,7 @@ set(INJECTOR_CORE_SOURCES
 
 # Core implementation is shared between the DLL and unit tests.
 add_library(InjectorCore STATIC ${INJECTOR_CORE_SOURCES})
-add_library(${PROJECT_NAME} SHARED Entry.cpp)
+add_library(${PROJECT_NAME} SHARED Entry.cpp ControlServer.cpp ControlServer.h ControlProtocol.h)
 target_link_libraries(${PROJECT_NAME} PRIVATE InjectorCore)
 
 foreach(target IN ITEMS InjectorCore ${PROJECT_NAME})

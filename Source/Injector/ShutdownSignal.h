@@ -15,8 +15,8 @@
 #include <mutex>
 
 namespace InjectorShutdown {
-// Request that the injector shut down. This can be called from any thread,
-// including platform callbacks (e.g. DllMain).
+// Request shutdown from a normal worker thread. Never call under loader lock
+// (DllMain), because notifying registered waiters acquires C++ mutexes.
 void RequestShutdown();
 
 // Returns true if shutdown has been requested.

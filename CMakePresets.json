@@ -79,6 +79,22 @@
       "architecture": "x64"
     },
     {
+      "name": "windows-ninja-release",
+      "inherits": "base",
+      "displayName": "Windows Release (Ninja + MSVC developer environment)",
+      "generator": "Ninja",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl"
+      }
+    },
+    {
       "name": "linux-debug",
       "inherits": "base",
       "generator": "Ninja",
@@ -106,6 +122,11 @@
     }
   ],
   "buildPresets": [
+    {
+      "name": "windows-ninja-release",
+      "configurePreset": "windows-ninja-release",
+      "configuration": "Release"
+    },
     {
       "name": "windows-debug",
       "configurePreset": "windows-debug",
@@ -138,6 +159,17 @@
     }
   ],
   "testPresets": [
+    {
+      "name": "windows-ninja-release",
+      "configurePreset": "windows-ninja-release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
     {
       "name": "windows-debug",
       "configurePreset": "windows-debug",

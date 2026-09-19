@@ -45,12 +45,13 @@ inline const char* HookErrorToString(HookError error) {
 // Base class for all detour hooks.
 class Hook {
 public:
+  virtual ~Hook() = default;
   // Installs the hook.
   // Returns HookError::Success on success, otherwise a non-zero error.
   virtual HookError Install(const InjectorContext& context) = 0;
 
   // Uninstalls the hook.
-  virtual void Uninstall() = 0;
+  virtual bool Uninstall() = 0;
 
   // Gets a descriptive name for what this hook is doing.
   virtual const char* GetName() = 0;

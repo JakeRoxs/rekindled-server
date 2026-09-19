@@ -4,8 +4,32 @@ on:
   workflow_dispatch:
   push:
     branches: [main, development]
+    paths:
+      - 'Source/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'CMakeUserPresets.json'
+      - 'vcpkg.json'
+      - 'vcpkg-toolchain.cmake'
+      - 'tools/**'
+      - '.github/actions/**'
+      - '.github/workflows/ci.yml'
+      - '!docs/**'
+      - '!README.md'
   pull_request:
     branches: [main, development]
+    paths:
+      - 'Source/**'
+      - 'CMakeLists.txt'
+      - 'CMakePresets.json'
+      - 'CMakeUserPresets.json'
+      - 'vcpkg.json'
+      - 'vcpkg-toolchain.cmake'
+      - 'tools/**'
+      - '.github/actions/**'
+      - '.github/workflows/ci.yml'
+      - '!docs/**'
+      - '!README.md'
 
 permissions:
   contents: read
@@ -54,9 +78,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Keep the hosted Visual Studio version aligned with the CMake preset.
+          # Ninja uses MSVC from the runner and supports the sccache launcher.
           - os: windows-2025-vs2026
-            preset: windows-vs2026-release
+            preset: windows-ninja-release
           - os: ubuntu-latest
             preset: linux-release
     steps:

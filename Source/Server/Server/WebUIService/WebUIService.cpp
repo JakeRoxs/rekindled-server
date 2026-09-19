@@ -44,6 +44,9 @@ WebUIService::~WebUIService() {
   if (WebServer) {
     WebServer->stop();
   }
+  if (SSLWebServer) {
+    SSLWebServer->stop();
+  }
   if (WebThread.joinable()) {
     WebThread.join();
   }
@@ -51,6 +54,7 @@ WebUIService::~WebUIService() {
 
 bool WebUIService::Init() {
   int Port = ServerInstance->GetConfig().WebUIServerPort;
+  UseHTTPS = ServerInstance->GetConfig().WebUIServerUseHTTPS;
 
   std::filesystem::path StaticPath = std::filesystem::current_path() / "../../Source/WebUI/Static";
   if (!std::filesystem::exists(StaticPath)) {
@@ -61,25 +65,51 @@ bool WebUIService::Init() {
     return false;
   }
 
-  WebServer = std::make_unique<httplib::Server>();
+  httplib::Server* ActiveServer = nullptr;
 
-  // Serve the static WebUI assets.
-  WebServer->set_mount_point("/", StaticPath.string());
+  if (UseHTTPS) {
+    std::string CertPath = ServerInstance->GetConfig().WebUIServerCertPath;
+    std::string KeyPath = ServerInstance->GetConfig().WebUIServerKeyPath;
 
-  for (auto Handler : Handlers) {
-    Handler->Register(WebServer.get());
+    if (CertPath.empty() || KeyPath.empty()) {
+      ErrorS("WebUI", "HTTPS is enabled but cert or key path is not configured.");
+      return false;
+    }
+
+    SSLWebServer = std::make_unique<httplib::SSLServer>(CertPath.c_str(), KeyPath.c_str());
+
+    // Serve the static WebUI assets.
+    SSLWebServer->set_mount_point("/", StaticPath.string());
+
+    for (auto Handler : Handlers) {
+      Handler->Register(SSLWebServer.get());
+    }
+
+    ActiveServer = SSLWebServer.get();
+  } else {
+    WebServer = std::make_unique<httplib::Server>();
+
+    // Serve the static WebUI assets.
+    WebServer->set_mount_point("/", StaticPath.string());
+
+    for (auto Handler : Handlers) {
+      Handler->Register(WebServer.get());
+    }
+
+    ActiveServer = WebServer.get();
   }
 
   // Run the (blocking) listener on a background thread, since httplib's
   // listen() blocks for the lifetime of the server. Bind all interfaces so
   // the WebUI and sharding endpoints are reachable by local and remote clients.
-  WebThread = std::thread([this, Port]() {
-    if (!WebServer->listen("0.0.0.0", Port)) {
+  WebThread = std::thread([ActiveServer, Port]() {
+    if (!ActiveServer->listen("0.0.0.0", Port)) {
       ErrorS("WebUI", "Failed to start WebUI listener.");
     }
   });
 
-  Log("WebUI service is now listening at http://localhost:%i/", Port);
+  std::string Scheme = UseHTTPS ? "https" : "http";
+  Log("WebUI service is now listening at %s://localhost:%i/", Scheme.c_str(), Port);
 
   return true;
 }
@@ -87,6 +117,9 @@ bool WebUIService::Init() {
 bool WebUIService::Term() {
   if (WebServer) {
     WebServer->stop();
+  }
+  if (SSLWebServer) {
+    SSLWebServer->stop();
   }
   if (WebThread.joinable()) {
     WebThread.join();

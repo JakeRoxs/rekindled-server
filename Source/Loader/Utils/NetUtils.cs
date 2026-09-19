@@ -14,8 +14,8 @@ namespace Loader
 
     private static string ResolvePublicIpServiceUrl()
     {
-      string configuredUrl = Environment.GetEnvironmentVariable("REKINDLED_PUBLIC_IP_SERVICE_URL");
-      if (!string.IsNullOrWhiteSpace(configuredUrl) && Uri.TryCreate(configuredUrl, UriKind.Absolute, out Uri configuredUri))
+      string? configuredUrl = Environment.GetEnvironmentVariable("REKINDLED_PUBLIC_IP_SERVICE_URL");
+      if (!string.IsNullOrWhiteSpace(configuredUrl) && Uri.TryCreate(configuredUrl, UriKind.Absolute, out Uri? configuredUri))
       {
         return configuredUri.ToString();
       }
@@ -27,8 +27,8 @@ namespace Loader
     {
       try
       {
-        IPAddress Address = Dns.GetHostAddresses(Hostname).FirstOrDefault(Addr => Addr.AddressFamily == AddressFamily.InterNetwork);
-        return Address != null ? Address.ToString() : string.Empty;
+        IPAddress? Address = Dns.GetHostAddresses(Hostname).FirstOrDefault(Addr => Addr.AddressFamily == AddressFamily.InterNetwork);
+        return Address is not null ? Address.ToString() : string.Empty;
       }
       catch (SocketException)
       {

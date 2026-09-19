@@ -102,11 +102,12 @@ void ShardingHandler::HandlePost(const httplib::Request& Req, httplib::Response&
   const RuntimeConfig& Config = Instance->GetConfig();
 
   std::string Hostname = Config.ServerHostname.length() > 0 ? Config.ServerHostname : Instance->GetPublicIP().ToString();
+  std::string Scheme = Config.WebUIServerUseHTTPS ? "https" : "http";
 
   nlohmann::json responseJson;
   responseJson["id"] = Instance->GetId();
   responseJson["webUsername"] = Config.WebUIServerUsername;
   responseJson["webPassword"] = Config.WebUIServerPassword;
-  responseJson["webUrl"] = StringFormat("http://%s:%i/", Hostname.c_str(), Config.WebUIServerPort);
+  responseJson["webUrl"] = StringFormat("%s://%s:%i/", Scheme.c_str(), Hostname.c_str(), Config.WebUIServerPort);
   RespondJson(Res, responseJson);
 }

@@ -14,7 +14,7 @@ open alerts on GitHub or SonarQube. It supports:
 - De-dup/update behavior: existing todo file is updated if content changed, otherwise left alone
 
 Usage:
-  python Tools/Utilities/fetch_code_scanning_alerts.py \
+  python tools/Utilities/fetch_code_scanning_alerts.py \
     --owner jakeroxs --repo rekindled-server \
     --write-todos
 

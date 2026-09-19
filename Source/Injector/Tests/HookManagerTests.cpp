@@ -2,6 +2,7 @@
 #include <optional>
 
 #include "Injector/HookManager.h"
+#include "Injector/Hooks/DarkSouls2/DS2_ReplaceServerAddressHook.h"
 
 // A simple stub hook implementation that records whether Install/Uninstall were called.
 struct StubHook : public Hook {
@@ -14,8 +15,11 @@ struct StubHook : public Hook {
     return InstallErrorCode;
   }
 
-  void Uninstall() override {
+  bool Uninstall() override {
+    if (FailUninstall)
+      return false;
     Uninstalled = true;
+    return true;
   }
 
   const char* GetName() override {
@@ -25,6 +29,7 @@ struct StubHook : public Hook {
   HookError InstallErrorCode = HookError::Success;
   bool Installed = false;
   bool Uninstalled = false;
+  bool FailUninstall = false;
 };
 
 // A hook implementation that exercises the search callbacks in InjectorContext and records the result.
@@ -41,8 +46,9 @@ struct SearchCallbackHook : public Hook {
     return InstallErrorCode;
   }
 
-  void Uninstall() override {
+  bool Uninstall() override {
     Uninstalled = true;
+    return true;
   }
 
   const char* GetName() override {
@@ -59,6 +65,46 @@ struct SearchCallbackHook : public Hook {
 };
 
 void RunHookManagerTests() {
+  // A failed restore preserves its state for retry instead of being forgotten.
+  {
+    RuntimeConfig config;
+    InjectorContext context{config, GameType::Unknown, 0, {}, {}, {}};
+    HookManager manager;
+    auto hook = std::make_unique<StubHook>(HookError::Success);
+    auto* state = hook.get();
+    state->FailUninstall = true;
+    manager.AddHook(std::move(hook));
+    assert(manager.InstallAll(context) == ERROR_SUCCESS);
+    assert(manager.UninstallAll() == ERROR_WRITE_FAULT);
+    assert(!state->Uninstalled);
+    state->FailUninstall = false;
+    assert(manager.UninstallAll() == ERROR_SUCCESS);
+    assert(state->Uninstalled);
+    assert(manager.UninstallAll() == ERROR_SUCCESS);
+  }
+
+  // Both normal DS2 restoration and rollback after only the key was patched.
+  for (bool hostnameFound : {true, false}) {
+    RuntimeConfig config;
+    config.ServerHostname = "localhost";
+    config.ServerPublicKey = "replacement-key";
+    std::vector<unsigned char> key(512, 0xAB);
+    std::vector<unsigned char> hostname(128, 0xCD);
+    const auto originalKey = key;
+    const auto originalHostname = hostname;
+    InjectorContext context{
+        config, GameType::DarkSouls2, 0, {}, [&](const std::string&) { return std::vector<intptr_t>{reinterpret_cast<intptr_t>(key.data())}; }, [&](const std::wstring&) { return hostnameFound ? std::vector<intptr_t>{reinterpret_cast<intptr_t>(hostname.data())} : std::vector<intptr_t>{}; }};
+    HookManager manager;
+    manager.AddHook(std::make_unique<DS2_ReplaceServerAddressHook>());
+    const DWORD result = manager.InstallAll(context);
+    assert((result == ERROR_SUCCESS) == hostnameFound);
+    if (hostnameFound) {
+      assert(key != originalKey && hostname != originalHostname);
+      assert(manager.UninstallAll() == ERROR_SUCCESS);
+    }
+    assert(key == originalKey && hostname == originalHostname);
+  }
+
   // Case 1: all hooks install; uninstall should not be called until requested.
   {
     RuntimeConfig config;
@@ -119,8 +165,8 @@ void RunHookManagerTests() {
     assert(ptr1->Installed);
     assert(ptr2->Installed);
     assert(ptr1->Uninstalled);
-    // The failing hook should not be uninstalled (it never installed successfully).
-    assert(!ptr2->Uninstalled);
+    // A failed install may have partially patched the process and needs rollback.
+    assert(ptr2->Uninstalled);
   }
 
   // Case 3: verify that hooks can use the InjectorContext search callbacks.

@@ -6,11 +6,11 @@
 
 project(Server C CXX)
 
-SET(SOURCES
-    Entry.cpp
-
+SET(LIB_SOURCES
     Client/Client.cpp
     Client/Client.h
+    Client/ClientSession.h
+    Client/ClientSession.cpp
 
     Config/BuildConfig.h
     Config/RuntimeConfig.h
@@ -91,16 +91,22 @@ SET(SOURCES
     Server/WebUIService/Handlers/WebUIHandler.cpp
     Server/WebUIService/Handlers/WebUIHandler.h
 )
- 
-add_executable(${PROJECT_NAME} ${SOURCES} ${PLATFORM_SOURCES})
 
-target_include_directories(${PROJECT_NAME} PUBLIC 
+add_library(${PROJECT_NAME}_lib STATIC ${LIB_SOURCES} ${PLATFORM_SOURCES})
+
+add_executable(${PROJECT_NAME} Entry.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE DarkSouls3 DarkSouls2 ${PROJECT_NAME}_lib)
+
+# Standalone client emulator executable
+add_subdirectory(ClientEmu)
+
+target_include_directories(${PROJECT_NAME}_lib PUBLIC 
     "${CMAKE_CURRENT_SOURCE_DIR}" 
     "${CMAKE_CURRENT_SOURCE_DIR}/../"
 )
 
 if(WIN32)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE
+    target_compile_definitions(${PROJECT_NAME}_lib PRIVATE
         _CRT_SECURE_NO_WARNINGS
         _WINSOCK_DEPRECATED_NO_WARNINGS
         _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
@@ -110,7 +116,7 @@ if(WIN32)
         _WIN32_WINNT=0x0A00
     )
 else()
-    target_compile_definitions(${PROJECT_NAME} PRIVATE
+    target_compile_definitions(${PROJECT_NAME}_lib PRIVATE
         _CRT_SECURE_NO_WARNINGS
         _SILENCE_ALL_CXX17_DEPRECATION_WARNINGS
     )
@@ -166,7 +172,7 @@ if(TARGET ${REKINDLED_SQLITE_TARGET})
 endif()
 
 target_link_libraries(
-    ${PROJECT_NAME}
+    ${PROJECT_NAME}_lib
     DarkSouls3
     DarkSouls2
     Shared
@@ -176,7 +182,12 @@ target_link_libraries(
     steam
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE $<TARGET_PROPERTY:httplib,INTERFACE_INCLUDE_DIRECTORIES>)
+target_include_directories(${PROJECT_NAME}_lib PUBLIC 
+    "${CMAKE_CURRENT_SOURCE_DIR}" 
+    "${CMAKE_CURRENT_SOURCE_DIR}/../"
+)
+
+target_include_directories(${PROJECT_NAME}_lib PRIVATE $<TARGET_PROPERTY:httplib,INTERFACE_INCLUDE_DIRECTORIES>)
 
 # Refresh runtime assets on incremental builds, even when no C++ files changed.
 add_custom_target(ServerRuntimeAssets
@@ -216,5 +227,25 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME ServerClientConfigTests COMMAND ServerClientConfigTests)
+
+    # ClientSession state machine unit tests
+    add_executable(ServerClientSessionTests
+        Client/Tests/ClientSessionTests.cpp
+    )
+
+    target_include_directories(ServerClientSessionTests PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/.."
+    )
+
+    target_link_libraries(ServerClientSessionTests PRIVATE
+        DarkSouls3
+        Server_lib
+        Shared
+        steam
+        libprotobuf-lite
+    )
+
+    add_test(NAME ServerClientSessionTests COMMAND ServerClientSessionTests)
 
 endif()

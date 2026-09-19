@@ -19,10 +19,16 @@
 class DS2_ReplaceServerAddressHook : public Hook {
 public:
   virtual HookError Install(const InjectorContext& context) override;
-  virtual void Uninstall() override;
+  bool Uninstall() override;
   virtual const char* GetName() override;
 
 private:
+  struct Patch {
+    intptr_t Address;
+    std::vector<unsigned char> Original;
+  };
+  std::vector<Patch> Patches;
+  void Remember(intptr_t address, size_t length);
   HookError PatchKey(const InjectorContext& context);
   HookError PatchHostname(const InjectorContext& context);
 };

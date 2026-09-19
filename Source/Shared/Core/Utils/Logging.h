@@ -16,6 +16,7 @@
 #include "Shared/Platform/Platform.h"
 
 #include <list>
+#include <cstdarg>
 
 #define STRINGIFY2(x) #x
 #define STRINGIFY(x) STRINGIFY2(x)
@@ -27,14 +28,21 @@ struct LogMessage {
   std::string Message;
 };
 
-// Disbale all but error messages.
+// Restrict console output to important messages. File sinks still receive all levels.
 void SetQuietLogging(bool enabled);
+
+// Optional process-local sink; calls are serialized. Clearing it waits for any
+// in-flight write. A sink must not call back into the logging API.
+using LogSink = void (*)(const char* formatted);
+void SetLogSink(LogSink sink);
+bool HasLogSink();
 
 // Gets the most recent log messages, so they can be displayed in webui or other places.
 std::list<LogMessage> GetRecentLogs();
 
 // Writes a given entry into the output log.
 void WriteLog(bool QuietLoggable, ConsoleColor Color, const char* Source, const char* Level, const char* Format, ...);
+void WriteLogV(bool QuietLoggable, ConsoleColor Color, const char* Source, const char* Level, const char* Format, va_list args);
 
 // Various macros for different log levels.
 #if defined(_DEBUG)

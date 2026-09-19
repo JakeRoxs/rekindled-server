@@ -55,11 +55,9 @@ namespace Loader
     // This is a super shitty way of doing most of this, it should be async, but got a bunch of wierd deadlocks when
     // I tried it before, and fixing it would require me learning more C# than I want to ...
 
-    private static ResultType DoRequest<ResultType>(HttpMethod Method, string Uri, HttpContent Content = null)
+    private static ResultType? DoRequest<ResultType>(HttpMethod Method, string Uri, HttpContent? Content = null)
         where ResultType : BaseResponse
     {
-      ResultType Result = null;
-
       try
       {
         using HttpRequestMessage Request = new HttpRequestMessage(Method, Uri);
@@ -72,7 +70,7 @@ namespace Loader
           return null;
         }
 
-        Task<ResultType> ResponseTask = Response.Content.ReadFromJsonAsync<ResultType>();
+        Task<ResultType?> ResponseTask = Response.Content.ReadFromJsonAsync<ResultType?>();
         ResponseTask.ConfigureAwait(false);
         ResponseTask.Wait();
         if (!ResponseTask.IsCompletedSuccessfully)
@@ -81,14 +79,14 @@ namespace Loader
           return null;
         }
 
-        ResultType TypedResponse = ResponseTask.Result;
-        if (TypedResponse.Status != "success")
+        ResultType? TypedResponse = ResponseTask.Result;
+        if (TypedResponse is null || TypedResponse.Status != "success")
         {
-          Debug.WriteLine("Got error when trying to query hub server: {0}", TypedResponse.Status);
+          Debug.WriteLine("Got error when trying to query hub server: {0}", TypedResponse?.Status ?? "null response");
           return null;
         }
 
-        Result = ResponseTask.Result;
+        return TypedResponse;
       }
       catch (HttpRequestException Ex)
       {
@@ -111,13 +109,13 @@ namespace Loader
         Debug.WriteLine("Received exception when trying to get servers: {0}", Ex.Message);
       }
 
-      return Result;
+      return null;
     }
 
     public static List<ServerConfig> ListServers()
     {
-      ListServersResponse Result = DoRequest<ListServersResponse>(HttpMethod.Get, ProgramSettings.Default.hub_server_url + "/api/v1/servers");
-      if (Result != null && Result.Servers != null)
+      ListServersResponse? Result = DoRequest<ListServersResponse>(HttpMethod.Get, ProgramSettings.Default.hub_server_url + "/api/v1/servers");
+      if (Result is not null && Result.Servers is not null)
       {
         foreach (ServerConfig config in Result.Servers.Where(config => string.IsNullOrEmpty(config.Id) && !string.IsNullOrEmpty(config.IpAddress)))
         {
@@ -134,8 +132,8 @@ namespace Loader
       GetPublicKeyRequest Request = new GetPublicKeyRequest();
       Request.Password = Password;
 
-      GetPublicKeyResponse Result = DoRequest<GetPublicKeyResponse>(HttpMethod.Post, ProgramSettings.Default.hub_server_url + "/api/v1/servers/" + ServerId + "/public_key", JsonContent.Create<GetPublicKeyRequest>(Request));
-      if (Result != null)
+      GetPublicKeyResponse? Result = DoRequest<GetPublicKeyResponse>(HttpMethod.Post, ProgramSettings.Default.hub_server_url + "/api/v1/servers/" + ServerId + "/public_key", JsonContent.Create<GetPublicKeyRequest>(Request));
+      if (Result is not null)
       {
         return Result.PublicKey;
       }

@@ -150,7 +150,7 @@ nix版本将配置存储在 `${XDG_CONFIG_HOME:-$HOME/.config}/rekindled-server`
 
 ```
 /
-├── Protobuf/              包含服务器网络流量使用的protobuf定义。通过Tools/中的bat文件进行编译。
+├── Protobuf/              包含服务器网络流量使用的protobuf定义。通过tools/中的bat文件进行编译。
 ├── Resources/             用于构建和打包的一般资源例如图标/自述文件等。
 ├── Source/                项目的所有源代码。
 │   ├── Injector/          这是注入到游戏中以提供Rekindled Server功能的DLL。
@@ -162,7 +162,7 @@ nix版本将配置存储在 `${XDG_CONFIG_HOME:-$HOME/.config}/rekindled-server`
 │   ├── Shared/            服务器和注入器项目之间共享的源代码。
 │   └── ThirdParty/        使用的任何第三方库的源代码。
 │   └── WebUI/             包含用于管理服务器的网页后台的静态资源。
-├── Tools/                 用于分析的各种ce表、bat文件等。
+├── tools/                 用于分析的各种ce表、bat文件等。
 ```
 
 # 我可以做些什么？

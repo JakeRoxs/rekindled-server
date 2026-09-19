@@ -32,6 +32,8 @@ HookError DS2_ReplaceServerAddressHook::Install(const InjectorContext& context) 
 HookError DS2_ReplaceServerAddressHook::PatchHostname(const InjectorContext& context) {
   const RuntimeConfig& Config = context.Config;
   std::wstring WideHostname = WidenString(Config.ServerHostname);
+  if (WideHostname.size() > std::wstring_view(L"frpg2-steam64-ope-login.fromsoftware-game.net").size())
+    return HookError::InvalidState;
 
   char* WinePrefix = std::getenv("WINEPREFIX");
 
@@ -53,6 +55,7 @@ HookError DS2_ReplaceServerAddressHook::PatchHostname(const InjectorContext& con
     }
 
     wchar_t* ptr = (wchar_t*)key;
+    Remember(key, (WideHostname.size() + 1) * sizeof(wchar_t));
     for (size_t i = 0; i < WideHostname.size() + 1; i++) {
       wchar_t chr = WideHostname[i];
 
@@ -79,6 +82,8 @@ HookError DS2_ReplaceServerAddressHook::PatchKey(const InjectorContext& context)
 
   const RuntimeConfig& Config = context.Config;
   size_t CopyLength = Config.ServerPublicKey.size() + 1;
+  if (CopyLength > 427)
+    return HookError::InvalidState;
 
   std::vector<intptr_t> key_matches = context.SearchString({"-----BEGIN RSA PUBLIC KEY-----\n"
                                                             "MIIBCAKCAQEAxSeDuBTm3AytrIOGjDKpwJY+437i1F8leMBASVkknYdzM5HB4z8X\n"
@@ -107,6 +112,7 @@ HookError DS2_ReplaceServerAddressHook::PatchKey(const InjectorContext& context)
       }
     }
 
+    Remember(key, CopyLength);
     memcpy((char*)key, Config.ServerPublicKey.c_str(), CopyLength);
     FoundKey = true;
   }
@@ -119,7 +125,21 @@ HookError DS2_ReplaceServerAddressHook::PatchKey(const InjectorContext& context)
   return HookError::Success;
 }
 
-void DS2_ReplaceServerAddressHook::Uninstall() {
+void DS2_ReplaceServerAddressHook::Remember(intptr_t address, size_t length) {
+  auto* bytes = reinterpret_cast<const unsigned char*>(address);
+  Patches.push_back({address, {bytes, bytes + length}});
+}
+
+bool DS2_ReplaceServerAddressHook::Uninstall() {
+  while (!Patches.empty()) {
+    const auto& patch = Patches.back();
+    SIZE_T written = 0;
+    if (!WriteProcessMemory(GetCurrentProcess(), reinterpret_cast<void*>(patch.Address),
+                            patch.Original.data(), patch.Original.size(), &written) || written != patch.Original.size())
+      return false;
+    Patches.pop_back();
+  }
+  return true;
 }
 
 const char* DS2_ReplaceServerAddressHook::GetName() {

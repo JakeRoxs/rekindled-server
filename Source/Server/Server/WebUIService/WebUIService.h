@@ -39,7 +39,12 @@ public:
   virtual std::string GetName() override;
 
   Server* GetServer() { return ServerInstance; }
-  httplib::Server* GetWebServer() { return WebServer.get(); }
+  httplib::Server* GetWebServer() {
+    if (UseHTTPS) {
+      return SSLWebServer.get();
+    }
+    return WebServer.get();
+  }
 
 public:
   bool CheckAuthToken(const std::string& Token);
@@ -57,7 +62,9 @@ private:
 
   Server* ServerInstance;
 
+  bool UseHTTPS;
   std::unique_ptr<httplib::Server> WebServer;
+  std::unique_ptr<httplib::SSLServer> SSLWebServer;
   std::thread WebThread;
 
   std::vector<std::shared_ptr<WebUIHandler>> Handlers;

@@ -32,9 +32,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Keep the hosted Visual Studio version aligned with the CMake preset.
+          # Ninja uses MSVC from the runner and supports the sccache launcher.
           - os: windows-2025-vs2026
-            preset: windows-vs2026-release
+            preset: windows-ninja-release
             platform: windows
           - os: ubuntu-latest
             preset: linux-release
@@ -61,7 +61,7 @@ jobs:
           LOADER_WINDOWS_RUNTIME: win-x64
         run: |
           cd "${{ github.workspace }}"
-          ./Tools/generate_package_windows.bat
+          ./tools/generate_package_windows.bat
 
       - name: Package Release (Linux)
         if: matrix.platform == 'linux'
@@ -72,7 +72,7 @@ jobs:
           LOADER_AVALONIA_LINUX_RUNTIME: linux-x64
         run: |
           cd "${{ github.workspace }}"
-          "${{ github.workspace }}/Tools/generate_package_linux.sh"
+          "${{ github.workspace }}/tools/generate_package_linux.sh"
 
       - name: Verify packaged files
         shell: bash

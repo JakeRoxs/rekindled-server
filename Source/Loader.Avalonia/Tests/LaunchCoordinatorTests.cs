@@ -13,7 +13,6 @@ namespace Loader.Tests
     private const string DarkSouls3ExePath = WindowsGameDirectory + @"\DarkSoulsIII.exe";
     private const string DarkSouls2ExePath = WindowsGameDirectory + @"\DarkSoulsII.exe";
     private const string WindowsSteamAppIdPath = WindowsGameDirectory + @"\steam_appid.txt";
-    private const string SteamAppIdFileName = "steam_appid.txt";
     private const string LinuxProtonInjectorScriptPath = "/home/user/proton-injector/scripts/inject.sh";
     private const string LinuxInjectorDllPath = "/opt/loader/Injector.dll";
     private const string LinuxExePath = "/home/user/.local/share/Steam/steamapps/common/DarkSoulsIII/DarkSoulsIII.exe";
@@ -133,65 +132,75 @@ namespace Loader.Tests
       StringAssert.Contains(message, "Server: Test Server");
     }
 
-    [TestMethod]
-    public void TryExecuteLaunch_ReturnsFalse_WhenSteamAppIdWriteFails()
+    [DataTestMethod]
+    [DataRow("failed_to_write_steam_appid: disk full")]
+    [DataRow("failed_to_run_game_exe")]
+    [DataRow(null)]
+    public void TryExecuteLaunch_ReturnsWindowsServiceFailure(string? errorMessage)
     {
       FakeLaunchPlatformServices platform = CreateValidPlatformServices();
-      platform.WriteAllTextException = new IOException("disk full");
+      platform.ExistingFiles.Add(DarkSouls3ExePath);
+      FakeWindowsLaunchService windows = new FakeWindowsLaunchService { ErrorMessage = errorMessage };
+      LaunchCoordinator coordinator = new LaunchCoordinator(platform, windows);
 
-      LaunchCoordinator coordinator = new LaunchCoordinator(platform);
-      string exePath = DarkSouls3ExePath;
-      platform.ExistingFiles.Add(exePath);
-
-      bool launched = coordinator.TryExecuteLaunch(CreateServer(), exePath, GameType.DarkSouls3, true, out string message);
+      bool launched = coordinator.TryExecuteLaunch(CreateServer(), DarkSouls3ExePath, GameType.DarkSouls3, true, out string message);
 
       Assert.IsFalse(launched);
-      StringAssert.StartsWith(message, $"Failed to write {SteamAppIdFileName}:");
-      StringAssert.Contains(message, "disk full");
+      Assert.AreEqual(errorMessage ?? "Windows launch failed.", message);
+      Assert.AreEqual(1, windows.CallCount);
     }
 
-    [TestMethod]
-    public void TryExecuteLaunch_ReturnsFalse_WhenProcessStartReturnsNull()
+    [DataTestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void TryExecuteLaunch_PassesPreparedConfigurationToWindowsService(bool useSeparateSaves)
     {
       FakeLaunchPlatformServices platform = CreateValidPlatformServices();
-      platform.StartedProcessId = null;
-
-      LaunchCoordinator coordinator = new LaunchCoordinator(platform);
-      string exePath = DarkSouls3ExePath;
-      platform.ExistingFiles.Add(exePath);
-
-      bool launched = coordinator.TryExecuteLaunch(CreateServer(), exePath, GameType.DarkSouls3, true, out string message);
-
-      Assert.IsFalse(launched);
-      Assert.AreEqual("Failed to start game process: Process.Start returned null.", message);
-      Assert.AreEqual(WindowsSteamAppIdPath, platform.LastWritePath);
-      Assert.AreEqual("374320", platform.LastWriteContents);
-    }
-
-    [TestMethod]
-    public void TryExecuteLaunch_ReturnsTrue_WhenProcessStarts()
-    {
-      FakeLaunchPlatformServices platform = CreateValidPlatformServices();
-      platform.StartedProcessId = 4242;
-
-      LaunchCoordinator coordinator = new LaunchCoordinator(platform);
+      platform.ExistingFiles.Add(DarkSouls3ExePath);
+      FakeWindowsLaunchService windows = new FakeWindowsLaunchService { Result = true };
+      LaunchCoordinator coordinator = new LaunchCoordinator(platform, windows);
       ServerConfig server = CreateServer();
-      string exePath = DarkSouls3ExePath;
-      platform.ExistingFiles.Add(exePath);
 
-      bool launched = coordinator.TryExecuteLaunch(server, exePath, GameType.DarkSouls3, true, out string message);
+      bool launched = coordinator.TryExecuteLaunch(server, DarkSouls3ExePath, GameType.DarkSouls3, useSeparateSaves, out string message);
 
-      Assert.IsTrue(launched);
-      Assert.AreEqual(exePath, platform.LastStartFileName);
-      Assert.AreEqual(WindowsGameDirectory, platform.LastStartWorkingDirectory);
-      Assert.AreEqual(WindowsSteamAppIdPath, platform.LastWritePath);
-      Assert.AreEqual("374320", platform.LastWriteContents);
+      Assert.IsTrue(launched, message);
+      Assert.AreEqual(1, windows.CallCount);
+      Assert.AreSame(server, windows.Config);
+      Assert.AreEqual(DarkSouls3ExePath, windows.ExeLocation);
+      Assert.AreEqual(platform.MachinePublicIp, windows.MachinePublicIp);
+      Assert.AreEqual(platform.MachinePrivateIp, windows.MachinePrivateIp);
+      Assert.AreEqual(useSeparateSaves, windows.UseSeparateSaveFiles);
+      Assert.AreEqual(platform.LoadConfiguration, windows.LoadConfiguration);
       Assert.AreEqual(1, platform.GetExeSimpleHashCallCount, "Launch execution should reuse a single prepared hash lookup.");
       Assert.AreEqual(1, platform.TryGetLoadConfigurationCallCount, "Launch execution should reuse a single prepared load-config lookup.");
-      StringAssert.Contains(message, "Launch started.");
-      StringAssert.Contains(message, "Process Id: 4242");
-      StringAssert.Contains(message, "Resolved Host: 127.0.0.1:4242");
-      StringAssert.Contains(message, "Note: Injector/memory patch handoff is not wired in this Avalonia slice yet.");
+      Assert.AreEqual("Game launched successfully for 'Test Server'.", message);
+      Assert.IsNull(platform.LastStartFileName);
+      Assert.IsNull(platform.LastWritePath);
+    }
+
+    [TestMethod]
+    public void TryExecuteLaunch_DoesNotCallWindowsService_WhenPreparationFails()
+    {
+      FakeLaunchPlatformServices platform = CreateValidPlatformServices();
+      FakeWindowsLaunchService windows = new FakeWindowsLaunchService { Result = true };
+      LaunchCoordinator coordinator = new LaunchCoordinator(platform, windows);
+
+      bool launched = coordinator.TryExecuteLaunch(CreateServer(), DarkSouls3ExePath, GameType.DarkSouls3, true, out string message);
+
+      Assert.IsFalse(launched);
+      Assert.AreEqual("Selected executable does not exist.", message);
+      Assert.AreEqual(0, windows.CallCount);
+    }
+
+    [TestMethod]
+    public void WindowsLaunchService_RejectsUnsupportedPlatformOrMissingPublicKey_BeforeNativeLaunch()
+    {
+      WindowsLaunchService windows = new WindowsLaunchService();
+
+      bool launched = windows.TryLaunch(CreateServer(), DarkSouls3ExePath, "", "", true, default, out string? message);
+
+      Assert.IsFalse(launched);
+      Assert.AreEqual(OperatingSystem.IsWindows() ? "no_public_key_available" : "Windows launch is only available on Windows.", message);
     }
 
     [TestMethod]
@@ -207,7 +216,8 @@ namespace Loader.Tests
       platform.CurrentProcessDirectory = "/opt/loader";
       platform.EnvironmentVariables["REKINDLED_PROTON_INJECTOR_SCRIPT"] = LinuxProtonInjectorScriptPath;
 
-      LaunchCoordinator coordinator = new LaunchCoordinator(platform);
+      FakeWindowsLaunchService windows = new FakeWindowsLaunchService();
+      LaunchCoordinator coordinator = new LaunchCoordinator(platform, windows);
       ServerConfig server = CreateServer();
       string exePath = LinuxExePath;
       platform.ExistingFiles.Add(exePath);
@@ -215,6 +225,7 @@ namespace Loader.Tests
       bool launched = coordinator.TryExecuteLaunch(server, exePath, GameType.DarkSouls3, true, out string message);
 
       Assert.IsTrue(launched, message);
+      Assert.AreEqual(0, windows.CallCount);
       Assert.AreEqual("/bin/bash", platform.LastStartFileName);
       Assert.AreEqual("/home/user/proton-injector/scripts", platform.LastStartWorkingDirectory);
       Assert.AreEqual(3, platform.LastStartArguments.Count);
@@ -266,6 +277,34 @@ namespace Loader.Tests
         Port = 4242,
         GameType = "DarkSouls3"
       };
+    }
+
+    private sealed class FakeWindowsLaunchService : IWindowsLaunchService
+    {
+      public bool Result { get; set; }
+      public string? ErrorMessage { get; set; }
+      public int CallCount { get; private set; }
+      public ServerConfig? Config { get; private set; }
+      public string? ExeLocation { get; private set; }
+      public string? MachinePublicIp { get; private set; }
+      public string? MachinePrivateIp { get; private set; }
+      public bool UseSeparateSaveFiles { get; private set; }
+      public DarkSoulsLoadConfig LoadConfiguration { get; private set; }
+
+      public bool TryLaunch(ServerConfig config, string exeLocation, string machinePublicIp,
+        string machinePrivateIp, bool useSeparateSaveFiles, DarkSoulsLoadConfig loadConfig,
+        out string? errorMessage)
+      {
+        CallCount++;
+        Config = config;
+        ExeLocation = exeLocation;
+        MachinePublicIp = machinePublicIp;
+        MachinePrivateIp = machinePrivateIp;
+        UseSeparateSaveFiles = useSeparateSaveFiles;
+        LoadConfiguration = loadConfig;
+        errorMessage = ErrorMessage;
+        return Result;
+      }
     }
 
     private sealed class FakeLaunchPlatformServices : LaunchCoordinator.ILaunchPlatformServices

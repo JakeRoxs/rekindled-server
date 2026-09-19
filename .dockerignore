@@ -19,10 +19,10 @@
 !Source/ThirdParty/**/*.dll
 !Source/ThirdParty/**.so
 !Source/ThirdParty/**/*.so
-!Tools/**.dll
-!Tools/**/*.dll
-!Tools/**.so
-!Tools/**/*.so
+!tools/**.dll
+!tools/**/*.dll
+!tools/**.so
+!tools/**/*.so
 
 # Fortran module files
 *.mod
@@ -37,18 +37,18 @@
 !Source/ThirdParty/**/*.lib
 !Source/ThirdParty/**.a
 !Source/ThirdParty/**/*.a
-!Tools/**.lib
-!Tools/**/*.lib
-!Tools/**.a
-!Tools/**/*.a
+!tools/**.lib
+!tools/**/*.lib
+!tools/**.a
+!tools/**/*.a
 
 # Executables
 *.exe
 *.out
 *.app
 !Resources/Prerequisites/*.exe
-!Tools/**.exe
-!Tools/**/*.exe
+!tools/**.exe
+!tools/**/*.exe
 
 Debug/
 /Bin/

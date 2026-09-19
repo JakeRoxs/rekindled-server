@@ -114,6 +114,7 @@ namespace Loader
     }
 
     private readonly ILaunchPlatformServices _platformServices;
+    private readonly IWindowsLaunchService _windowsLaunchService;
     private static readonly char[] PathTrimChars = new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
     private const string SteamAppIdFileName = "steam_appid.txt";
     private const string ProtonInjectorScriptsDirectory = "scripts";
@@ -127,8 +128,14 @@ namespace Loader
     }
 
     internal LaunchCoordinator(ILaunchPlatformServices platformServices)
+        : this(platformServices, new WindowsLaunchService())
+    {
+    }
+
+    internal LaunchCoordinator(ILaunchPlatformServices platformServices, IWindowsLaunchService windowsLaunchService)
     {
       _platformServices = platformServices ?? throw new ArgumentNullException(nameof(platformServices));
+      _windowsLaunchService = windowsLaunchService ?? throw new ArgumentNullException(nameof(windowsLaunchService));
     }
 
     public bool CanLaunchOnCurrentPlatform => _platformServices.CanLaunchOnCurrentPlatform;
@@ -154,7 +161,7 @@ namespace Loader
 
       if (_platformServices.IsWindows)
       {
-        return TryExecuteWindowsLaunch(exePath, loadConfig, launchPlan, out message);
+        return TryExecuteWindowsLaunch(server, exePath, loadConfig, useSeparateSaves, out message);
       }
 
       if (_platformServices.IsLinux)
@@ -195,50 +202,31 @@ namespace Loader
     }
 
     private bool TryExecuteWindowsLaunch(
+        ServerConfig server,
         string exePath,
         DarkSoulsLoadConfig loadConfig,
-        string launchPlan,
+        bool useSeparateSaves,
         out string message)
     {
-      string exeDirectory = _platformServices.GetDirectoryName(exePath) ?? string.Empty;
-      string appIdPath = CombinePathPreservingSeparator(exeDirectory, SteamAppIdFileName);
+      string machinePublicIp = _platformServices.GetMachineIPv4(true);
+      string machinePrivateIp = _platformServices.GetMachineIPv4(false);
 
-      try
+      bool success = _windowsLaunchService.TryLaunch(
+          server,
+          exePath,
+          machinePublicIp,
+          machinePrivateIp,
+          useSeparateSaves,
+          loadConfig,
+          out string? errorMessage);
+
+      if (!success)
       {
-        _platformServices.WriteAllText(appIdPath, loadConfig.SteamAppId.ToString());
-      }
-      catch (Exception ex)
-      {
-        message = $"Failed to write {SteamAppIdFileName}: {ex.Message}";
+        message = errorMessage ?? "Windows launch failed.";
         return false;
       }
 
-      int? processId;
-      try
-      {
-        processId = _platformServices.StartProcess(exePath, exeDirectory);
-      }
-      catch (Exception ex)
-      {
-        message = $"Failed to start game process: {ex.Message}";
-        return false;
-      }
-
-      if (!processId.HasValue)
-      {
-        message = "Failed to start game process: Process.Start returned null.";
-        return false;
-      }
-
-      StringBuilder summary = new StringBuilder();
-      summary.AppendLine("Launch started.");
-      summary.AppendLine($"Process Id: {processId.Value}");
-      summary.AppendLine();
-      summary.AppendLine(launchPlan);
-      summary.AppendLine();
-      summary.AppendLine("Note: Injector/memory patch handoff is not wired in this Avalonia slice yet.");
-
-      message = summary.ToString().TrimEnd();
+      message = $"Game launched successfully for '{server.Name}'.";
       return true;
     }
 

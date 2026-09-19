@@ -35,7 +35,7 @@ public:
   DWORD InstallAll(const InjectorContext& context);
 
   // Uninstalls all installed hooks.
-  void UninstallAll();
+  DWORD UninstallAll();
 
 private:
   std::vector<std::unique_ptr<Hook>> Hooks;

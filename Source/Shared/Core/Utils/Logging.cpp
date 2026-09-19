@@ -11,89 +11,111 @@
 #include "Shared/Core/Utils/Logging.h"
 #include "Shared/Platform/Platform.h"
 
+#include <atomic>
+#include <chrono>
 #include <ctime>
 #include <cstdarg>
-#include <list>
 #include <cstdio>
+#include <sstream>
+#include <thread>
+#include <vector>
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 
 namespace {
 std::mutex RecentMessageMutex;
 std::list<LogMessage> RecentMessages;
-bool QuietLoggingEnabled = false;
-}; // namespace
+std::mutex OutputMutex;
+std::atomic<bool> QuietLoggingEnabled{false};
+std::atomic<bool> SinkInstalled{false};
+LogSink Sink = nullptr;
+
+// Logging must not overwrite the Win32/Winsock error the caller is diagnosing.
+struct ErrorState {
+#ifdef _WIN32
+  DWORD Saved = GetLastError();
+  ~ErrorState() { SetLastError(Saved); }
+#endif
+};
+
+std::string FormatMessage(const char* format, va_list args) {
+  va_list copy;
+  va_copy(copy, args);
+  const int size = vsnprintf(nullptr, 0, format, copy);
+  va_end(copy);
+  if (size < 0)
+    return "[log formatting failed]";
+  std::vector<char> buffer(static_cast<size_t>(size) + 1);
+  va_copy(copy, args);
+  vsnprintf(buffer.data(), buffer.size(), format, copy);
+  va_end(copy);
+  return std::string(buffer.data(), static_cast<size_t>(size));
+}
+} // namespace
 
 void SetQuietLogging(bool enabled) {
-  QuietLoggingEnabled = enabled;
+  QuietLoggingEnabled.store(enabled);
+}
+
+void SetLogSink(LogSink sink) {
+  std::lock_guard<std::mutex> lock(OutputMutex);
+  Sink = sink;
+  SinkInstalled.store(sink != nullptr);
+}
+
+bool HasLogSink() {
+  return SinkInstalled.load();
 }
 
 std::list<LogMessage> GetRecentLogs() {
-  std::scoped_lock lock(RecentMessageMutex);
+  std::lock_guard<std::mutex> lock(RecentMessageMutex);
   return RecentMessages;
 }
 
-void StoreRecentMessage(const LogMessage& Message) {
-  std::scoped_lock lock(RecentMessageMutex);
+void WriteLogV(bool quietLoggable, ConsoleColor color, const char* source, const char* level, const char* format, va_list args) {
+  ErrorState preserveError;
+  const std::string message = FormatMessage(format, args);
+  std::lock_guard<std::mutex> outputLock(OutputMutex);
+  const auto now = std::chrono::system_clock::now();
+  const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000;
+  const std::time_t time = std::chrono::system_clock::to_time_t(now);
+  std::tm utc{};
+#ifdef _WIN32
+  gmtime_s(&utc, &time);
+#else
+  gmtime_r(&time, &utc);
+#endif
+  char timestamp[32]{};
+  strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%S", &utc);
+  char fraction[8]{};
+  snprintf(fraction, sizeof(fraction), ".%03dZ", static_cast<int>(milliseconds));
+  std::ostringstream line;
+  line << timestamp << fraction;
+#ifdef _WIN32
+  line << " [pid=" << GetCurrentProcessId() << " tid=" << GetCurrentThreadId() << "]";
+#else
+  line << " [tid=" << std::this_thread::get_id() << "]";
+#endif
+  line << " [" << level << "] [" << (source && *source ? source : "General") << "] " << message;
+  if (message.empty() || message.back() != '\n')
+    line << '\n';
+  const std::string rendered = line.str();
+  if (Sink)
+    Sink(rendered.c_str());
+  if (!QuietLoggingEnabled.load() || quietLoggable)
+    WriteToConsole(color, rendered.c_str());
 
-  RecentMessages.push_back(Message);
-
-  // Only keep a small buffer of messages, trim old ones.
-  if (RecentMessages.size() > 16) {
-    RecentMessages.erase(RecentMessages.begin());
-  }
+  LogMessage recent{GetSeconds(), source ? source : "", level, message};
+  std::lock_guard<std::mutex> recentLock(RecentMessageMutex);
+  RecentMessages.push_back(std::move(recent));
+  if (RecentMessages.size() > 128)
+    RecentMessages.pop_front();
 }
 
-void WriteLogStatic(ConsoleColor Color, const char* Source, const char* Level, const char* Log) {
-  char buffer[256];
-  char* buffer_to_use = buffer;
-
-  time_t current_time = time(0);
-  struct tm current_time_tstruct = *localtime(&current_time);
-
-  char time_buffer[32];
-  strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %X", &current_time_tstruct);
-
-  int ret = snprintf(buffer_to_use, 256, "%s \xB3 %-7s \xB3 %-35s \xB3 %s\n", time_buffer, Level, Source, Log);
-  if (ret >= 256) {
-    buffer_to_use = new char[ret + 1];
-    snprintf(buffer_to_use, ret + 1, "%s \xB3 %-7s \xB3 %-35s \xB3 %s\n", time_buffer, Level, Source, Log);
-  }
-
-  WriteToConsole(Color, buffer_to_use);
-
-  LogMessage Message;
-  Message.Level = Level;
-  Message.Source = Source;
-  Message.Message = Log;
-  Message.Time = GetSeconds();
-  StoreRecentMessage(Message);
-
-  if (buffer_to_use != buffer) {
-    delete[] buffer_to_use;
-  }
-}
-
-void WriteLog(bool QuietLoggable, ConsoleColor Color, const char* Source, const char* Level, const char* Format, ...) {
-  if (QuietLoggingEnabled && !QuietLoggable) {
-    return;
-  }
-
-  char buffer[256];
-  char* buffer_to_use = buffer;
-
-  va_list list;
-  va_start(list, Format);
-
-  int ret = vsnprintf(buffer_to_use, 256, Format, list);
-  if (ret >= 256) {
-    buffer_to_use = new char[ret + 1];
-    vsnprintf(buffer_to_use, ret + 1, Format, list);
-  }
-
-  WriteLogStatic(Color, Source, Level, buffer_to_use);
-
-  if (buffer_to_use != buffer) {
-    delete[] buffer_to_use;
-  }
-
-  va_end(list);
+void WriteLog(bool quietLoggable, ConsoleColor color, const char* source, const char* level, const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  WriteLogV(quietLoggable, color, source, level, format, args);
+  va_end(args);
 }
