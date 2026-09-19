@@ -67,10 +67,10 @@ inline bool is_packable(WireFormatLite::WireType type) {
   case WireFormatLite::WIRETYPE_START_GROUP:
   case WireFormatLite::WIRETYPE_END_GROUP:
     return false;
-
-    // Do not add a default statement. Let the compiler complain when someone
-    // adds a new wire type.
   }
+  // Do not add a default statement. Let the compiler complain when someone
+  // adds a new wire type.
+  return false;
 }
 
 // Registry stuff.

@@ -18,7 +18,7 @@
 #include "Server/GameService/GameManagers/Ghosts/DS2_GhostManager.h"
 #include "Server/GameService/GameManagers/BloodMessage/DS2_BloodMessageManager.h"
 #include "Server/GameService/GameManagers/Bloodstain/DS2_BloodstainManager.h"
-#include "Server/GameService/GameManagers/Signs/DS2_SignManager.h" 0
+#include "Server/GameService/GameManagers/Signs/DS2_SignManager.h"
 #include "Server/GameService/GameManagers/BreakIn/DS2_BreakInManager.h"
 #include "Server/GameService/GameManagers/Logging/DS2_LoggingManager.h"
 #include "Server/GameService/GameManagers/Misc/DS2_MiscManager.h"

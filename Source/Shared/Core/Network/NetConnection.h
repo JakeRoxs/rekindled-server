@@ -39,7 +39,9 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#ifndef _WINSOCKAPI_
 #define _WINSOCKAPI_
+#endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
