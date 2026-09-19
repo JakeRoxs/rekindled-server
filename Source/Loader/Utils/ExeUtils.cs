@@ -37,7 +37,7 @@ namespace Loader
       FileInfo info = new FileInfo(FilePath);
       FileVersionInfo versionInfo = FileVersionInfo.GetVersionInfo(FilePath);
 
-      return MakeSimpleExeHash(versionInfo.FileVersion, info.Length);
+      return MakeSimpleExeHash(versionInfo.FileVersion ?? "", info.Length);
     }
   }
 }

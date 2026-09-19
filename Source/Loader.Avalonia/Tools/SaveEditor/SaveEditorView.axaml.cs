@@ -279,7 +279,7 @@ namespace Loader.Tools.SaveEditor
             var save = isSource ? _sourceSave : _destSave;
             if (save == null) return;
 
-            save.Slots[index] = null;
+            save.Slots[index] = null!;
             save.Menu.OccupiedSlots[index] = false;
 
             if (isSource)

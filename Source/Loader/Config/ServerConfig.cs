@@ -33,7 +33,7 @@ namespace Loader
     {
       try
       {
-        config = JsonSerializer.Deserialize<ServerConfigList>(json);
+        config = JsonSerializer.Deserialize<ServerConfigList>(json) ?? new ServerConfigList();
         return true;
       }
       catch (JsonException)

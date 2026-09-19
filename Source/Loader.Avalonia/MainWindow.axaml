@@ -76,7 +76,7 @@
         <TextBox x:Name="ExeLocationTextBox"
                  Grid.Column="1"
                  Classes="touch-target"
-                 Watermark="Select game executable..." />
+                                   PlaceholderText="Select game executable..." />
         <Button x:Name="BrowseButton"
                 Grid.Column="2"
                 Classes="touch-target"
