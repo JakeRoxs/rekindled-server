@@ -5,7 +5,7 @@ FROM ubuntu@sha256:513c074113a871b51a8d16ab445c88779d6452d937a164fb5cc479f32668a
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -q -y --no-install-recommends \
         g++ make curl zip unzip tar binutils cmake git yasm ninja-build pkg-config \
-        libssl-dev zlib1g-dev libpcre3-dev libuuid1 uuid-dev uuid-runtime ca-certificates && \
+        libssl-dev zlib1g-dev libuuid1 uuid-dev uuid-runtime ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
 COPY ./ /build
