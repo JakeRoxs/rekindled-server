@@ -11,6 +11,7 @@
 #pragma once
 
 #include "Server/Game.h"
+#include <cstdint>
 
 class DS2_Game : public Game {
 public:

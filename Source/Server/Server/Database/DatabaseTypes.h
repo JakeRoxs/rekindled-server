@@ -13,6 +13,7 @@
 #include <Protobuf/SharedProtobufs.h>
 
 #include <unordered_set>
+#include <cstdint>
 
 // Blood message stored in the database or live cache.
 struct BloodMessage {

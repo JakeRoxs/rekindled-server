@@ -22,6 +22,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <inttypes.h>
 
 #ifdef _WIN32

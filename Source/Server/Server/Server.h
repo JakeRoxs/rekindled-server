@@ -17,6 +17,7 @@
 #include "Shared/Core/Crypto/RSAKeyPair.h"
 
 #include "Shared/Core/Network/NetIPAddress.h"
+#include <cstdint>
 
 #include "Shared/Game/GameType.h"
 

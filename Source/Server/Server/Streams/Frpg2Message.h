@@ -13,6 +13,7 @@
 #include "Shared/Core/Utils/Endian.h"
 
 #include <vector>
+#include <cstdint>
 
 // All the id's of message type we can receive.
 enum class Frpg2MessageType {
