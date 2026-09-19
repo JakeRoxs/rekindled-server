@@ -86,7 +86,7 @@ bool PlatformTerm() {
 }
 
 void WriteToConsole(ConsoleColor Color, const char* Message) {
-  // If stdout is not a terminal (e.g. running as a daemon), still write to a log file.
+  // Preserve file logging for non-interactive processes and also emit to stdout for Docker.
   if (!isatty(fileno(stdout))) {
     if (!g_LogFile) {
       const char* tmp = getenv("TMPDIR");
@@ -100,11 +100,11 @@ void WriteToConsole(ConsoleColor Color, const char* Message) {
     if (g_LogFile) {
       fprintf(g_LogFile, "%s", Message);
       fflush(g_LogFile);
-      return;
     }
   }
 
   printf("%s", Message);
+  fflush(stdout);
 }
 
 double GetSeconds() {

@@ -19,14 +19,11 @@ FROM ubuntu:26.04 AS runtime
 # default Steam AppID can be overridden with --build-arg STEAM_APP_ID=xxxx
 ARG STEAM_APP_ID=374320
 
-RUN mkdir -p /opt/rekindled-ds3-server/Saved \
-    && if ! id rekindled >/dev/null 2>&1; then \
-           useradd -r -s /bin/bash rekindled; \
-       fi \
-    && chown rekindled:rekindled /opt/rekindled-ds3-server/Saved \
-    && chown rekindled:rekindled /opt/rekindled-ds3-server \
-    && chmod 755 /opt/rekindled-ds3-server/Saved \
-    && chmod 755 /opt/rekindled-ds3-server \
+# Numeric IDs avoid collisions with accounts already present in the base image.
+ENV HOME=/home/rekindled
+RUN mkdir -p /opt/rekindled-ds3-server/Saved /home/rekindled \
+    && chown 1000:1000 /opt/rekindled-ds3-server/Saved /opt/rekindled-ds3-server /home/rekindled \
+    && chmod 755 /opt/rekindled-ds3-server/Saved /opt/rekindled-ds3-server /home/rekindled \
     && apt update \
     # Healthcheck needs curl to check the server
     && apt install -y --no-install-recommends --reinstall ca-certificates curl \
@@ -44,15 +41,15 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
 
 # write the AppID from build arg
 ENV STEAM_APP_ID=${STEAM_APP_ID}
-RUN echo "$STEAM_APP_ID" >> /opt/rekindled-ds3-server/steam_appid.txt
+USER 1000:1000
+RUN echo "$STEAM_APP_ID" > /opt/rekindled-ds3-server/steam_appid.txt
 
 # Copy only the built runtime outputs from the build stage into the runtime image.
 # Keep the runtime image small by avoiding a full /build copy.
-COPY --from=build /build/intermediate/cmake/linux-release/bin/Release/. /opt/rekindled-ds3-server/
+COPY --from=build --chown=1000:1000 /build/intermediate/cmake/linux-release/bin/Release/. /opt/rekindled-ds3-server/
 
 ENV LD_LIBRARY_PATH="/opt/rekindled-ds3-server"
 
-USER rekindled
 WORKDIR /opt/rekindled-ds3-server
 ENTRYPOINT ["/opt/rekindled-ds3-server/Server"]
 CMD [] 
