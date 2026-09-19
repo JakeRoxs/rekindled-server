@@ -13,11 +13,6 @@ WORKDIR /build
 RUN cmake --preset linux-release -DBUILD_TESTING=OFF && \
     cmake --build --preset linux-release --target Server --parallel "$(nproc)"
 
-FROM steamcmd/steamcmd:latest@sha256:a3ea6f8722e7b2ed2300927076794db199febd6fa4a316c0b0af2d2b7ce358f9 AS steam
-
-# Make steamcmd download steam client libraries so we can copy them later.
-RUN steamcmd +login anonymous +quit
-
 # runtime stage – also based on ubuntu LTS; allow STEAM_APP_ID to be overridden
 FROM ubuntu@sha256:513c074113a871b51a8d16ab445c88779d6452d937a164fb5cc479f32668a41d AS runtime
 
@@ -55,13 +50,6 @@ RUN echo "$STEAM_APP_ID" >> /opt/rekindled-ds2s-server/steam_appid.txt
 # Copy only the built runtime outputs from the build stage into the runtime image.
 # Avoid copying the full /build tree to keep image size small.
 COPY --from=build /build/intermediate/cmake/linux-release/bin/Release/. /opt/rekindled-ds2s-server/
-
-# Optional debug output during build (comment out in production):
-# RUN ls -al /opt/rekindled-ds2s-server && find /opt/rekindled-ds2s-server -maxdepth 4 -type f -print
-
-# Uncomment this to preserve full /build for inspection.
-# COPY --from=build /build /build
-COPY --from=steam /root/.local/share/Steam/steamcmd/linux64/steamclient.so /opt/rekindled-ds2s-server/steamclient.so
 
 ENV LD_LIBRARY_PATH="/opt/rekindled-ds2s-server"
 

@@ -154,7 +154,7 @@ namespace Loader
 
       if (_platformServices.IsWindows)
       {
-        return TryExecuteWindowsLaunch(exePath, loadConfig, launchPlan, out message);
+        return TryExecuteWindowsLaunch(server, exePath, gameType, useSeparateSaves, out message);
       }
 
       if (_platformServices.IsLinux)
@@ -195,51 +195,46 @@ namespace Loader
     }
 
     private bool TryExecuteWindowsLaunch(
+        ServerConfig server,
         string exePath,
-        DarkSoulsLoadConfig loadConfig,
-        string launchPlan,
+        GameType gameType,
+        bool useSeparateSaves,
         out string message)
     {
+#if WINDOWS
       string exeDirectory = _platformServices.GetDirectoryName(exePath) ?? string.Empty;
-      string appIdPath = CombinePathPreservingSeparator(exeDirectory, SteamAppIdFileName);
+      string simpleHash = _platformServices.GetExeSimpleHash(exePath);
 
-      try
+      if (!_platformServices.TryGetLoadConfiguration(simpleHash, out DarkSoulsLoadConfig loadConfig))
       {
-        _platformServices.WriteAllText(appIdPath, loadConfig.SteamAppId.ToString());
-      }
-      catch (Exception ex)
-      {
-        message = $"Failed to write {SteamAppIdFileName}: {ex.Message}";
+        message = "Could not determine game executable version support.";
         return false;
       }
 
-      int? processId;
-      try
+      string machinePublicIp = _platformServices.GetMachineIPv4(true);
+      string machinePrivateIp = _platformServices.GetMachineIPv4(false);
+
+      bool success = WindowsLaunchService.TryLaunch(
+          server,
+          exePath,
+          machinePublicIp,
+          machinePrivateIp,
+          useSeparateSaves,
+          loadConfig,
+          out string? errorMessage);
+
+      if (!success)
       {
-        processId = _platformServices.StartProcess(exePath, exeDirectory);
-      }
-      catch (Exception ex)
-      {
-        message = $"Failed to start game process: {ex.Message}";
+        message = errorMessage ?? "Windows launch failed.";
         return false;
       }
 
-      if (!processId.HasValue)
-      {
-        message = "Failed to start game process: Process.Start returned null.";
-        return false;
-      }
-
-      StringBuilder summary = new StringBuilder();
-      summary.AppendLine("Launch started.");
-      summary.AppendLine($"Process Id: {processId.Value}");
-      summary.AppendLine();
-      summary.AppendLine(launchPlan);
-      summary.AppendLine();
-      summary.AppendLine("Note: Injector/memory patch handoff is not wired in this Avalonia slice yet.");
-
-      message = summary.ToString().TrimEnd();
+      message = $"Game launched successfully for '{server.Name}'.";
       return true;
+#else
+      message = "Windows launch is only available when built for Windows.";
+      return false;
+#endif
     }
 
     private bool TryExecuteLinuxLaunch(
