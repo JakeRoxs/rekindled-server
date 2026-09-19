@@ -35,12 +35,17 @@
       <Setter Property="Background" Value="#1E2836" />
       <Setter Property="Padding" Value="12" />
       <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="ClipToBounds" Value="True" />
     </Style>
 
-    <Style Selector="Border.save-panel > TextBlock.panel-header">
+    <Style Selector="TextBlock.panel-header">
       <Setter Property="FontSize" Value="14" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+
+    <Style Selector="TextBlock.panel-slot-count">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="#AAB4C4" />
     </Style>
 
     <Style Selector="TextBlock.slot-name">
@@ -58,6 +63,55 @@
       <Setter Property="MinWidth" Value="60" />
       <Setter Property="FontSize" Value="16" />
       <Setter Property="Margin" Value="0,4" />
+    </Style>
+
+    <Style Selector="Border.empty-state">
+      <Setter Property="BorderBrush" Value="#556677" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="24" />
+      <Setter Property="Margin" Value="0,8" />
+    </Style>
+
+    <Style Selector="Border.empty-state > TextBlock">
+      <Setter Property="Foreground" Value="#8899AA" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+
+    <Style Selector="Border.error-banner">
+      <Setter Property="Background" Value="#5A2D2D" />
+      <Setter Property="BorderBrush" Value="#FF6B6B" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="8" />
+      <Setter Property="Margin" Value="0,4,0,8" />
+    </Style>
+
+    <Style Selector="Border.error-banner > TextBlock">
+      <Setter Property="Foreground" Value="#FF9999" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <Style Selector="TextBlock.save-success">
+      <Setter Property="Foreground" Value="#66BB6A" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="Button.bank-btn">
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="MinWidth" Value="32" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Padding" Value="4,0" />
+    </Style>
+
+    <Style Selector="Button.bank-btn:hover">
+      <Setter Property="Background" Value="#4A5F7A" />
+    </Style>
+
+    <Style Selector="Border.slot-card.duplicate">
+      <Setter Property="BorderBrush" Value="#FFD700" />
     </Style>
   </UserControl.Styles>
 
@@ -79,38 +133,81 @@
     <Grid Grid.Row="2" ColumnDefinitions="*,Auto,*" ColumnSpacing="12">
       <!-- Source save panel -->
       <Border Classes="save-panel" Grid.Column="0">
-        <DockPanel>
-          <TextBlock Text="Source Save" Classes="panel-header" DockPanel.Dock="Top" />
-          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-            <Button Content="Load Save" Classes="slot-action" Click="SourceLoadButton_OnClick" />
-            <Button Content="Save" Classes="slot-action" Click="SourceSaveButton_OnClick" />
-          </StackPanel>
-          <TextBlock x:Name="SourcePathText" Text="No save loaded" DockPanel.Dock="Top" Margin="0,0,0,8" FontSize="12" Foreground="#AAB4C4" />
-          <ScrollViewer HorizontalScrollBarVisibility="Hidden">
-            <StackPanel x:Name="SourceSlotsPanel" />
-          </ScrollViewer>
-        </DockPanel>
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+            <TextBlock x:Name="SourceLabel" Text="Source Save" Classes="panel-header" Margin="0" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBlock x:Name="SourceSteamIdText" Text="Steam ID: -" FontSize="11" Foreground="#AAB4C4" HorizontalAlignment="Right" />
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBox x:Name="SourceSteamIdBox" FontSize="11" Width="100" IsVisible="False" />
+                <Button x:Name="SourceSteamIdSaveButton" Content="Save" Click="SourceSteamIdSaveButton_OnClick" IsVisible="False" MinHeight="26" MinWidth="48" />
+                <Button x:Name="SourceSteamIdCancelButton" Content="Cancel" Click="SourceSteamIdCancelButton_OnClick" IsVisible="False" MinHeight="26" MinWidth="48" />
+              </StackPanel>
+            </StackPanel>
+          </Grid>
+          <TextBlock x:Name="SourceSlotCountText" Classes="panel-slot-count" Grid.Row="1" Margin="0,0,0,8" />
+          <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8" Margin="0,0,0,8">
+            <Button Content="Load Save" Classes="slot-action" Click="SourceLoadButton_OnClick" Grid.Column="0" Margin="0" />
+            <Button Content="Save" Classes="slot-action" Click="SourceSaveButton_OnClick" Grid.Column="1" Margin="0" />
+            <TextBlock x:Name="SourceSaveSuccessText" Classes="save-success" IsVisible="False" Text="Saved ✓" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,8,0" />
+            <Button x:Name="SourceSteamIdEditButton" Content="Edit Steam ID" Classes="slot-action" Click="SourceSteamIdEditButton_OnClick" Grid.Column="3" Margin="0" />
+          </Grid>
+          <Border x:Name="SourceErrorBanner" Classes="error-banner" Grid.Row="3" IsVisible="False">
+            <TextBlock x:Name="SourceErrorText" Text="" />
+          </Border>
+          <Grid x:Name="SourceDropPanel" Grid.Row="4" DragDrop.AllowDrop="True">
+            <TextBlock x:Name="SourcePathText" Text="No save loaded" Margin="0,0,0,8" FontSize="12" Foreground="#AAB4C4" />
+            <Border x:Name="SourceEmptyState" Classes="empty-state">
+              <TextBlock Text="Drag a save file here&#10;or click Load Save" />
+            </Border>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Hidden">
+              <StackPanel x:Name="SourceSlotsPanel" />
+            </ScrollViewer>
+          </Grid>
+        </Grid>
       </Border>
 
       <!-- Center arrows -->
       <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
         <Button x:Name="CopyRightButton" Content="→" Classes="direction-btn" Click="CopyRightButton_OnClick" />
         <Button Content="⇄" Classes="direction-btn" Click="SwapDirectionButton_OnClick" />
+        <Button x:Name="MoveAllButton" Content="Move All" Classes="direction-btn" Click="MoveAllButton_OnClick" />
       </StackPanel>
 
       <!-- Destination save panel -->
       <Border Classes="save-panel" Grid.Column="2">
-        <DockPanel>
-          <TextBlock Text="Destination Save" Classes="panel-header" DockPanel.Dock="Top" />
-          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-            <Button Content="Load Save" Classes="slot-action" Click="DestLoadButton_OnClick" />
-            <Button Content="Save" Classes="slot-action" Click="DestSaveButton_OnClick" />
-          </StackPanel>
-          <TextBlock x:Name="DestPathText" Text="No save loaded" DockPanel.Dock="Top" Margin="0,0,0,8" FontSize="12" Foreground="#AAB4C4" />
-          <ScrollViewer HorizontalScrollBarVisibility="Hidden">
-            <StackPanel x:Name="DestSlotsPanel" />
-          </ScrollViewer>
-        </DockPanel>
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
+          <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+            <TextBlock x:Name="DestLabel" Text="Destination Save" Classes="panel-header" Margin="0" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBlock x:Name="DestSteamIdText" Text="Steam ID: -" FontSize="11" Foreground="#AAB4C4" HorizontalAlignment="Right" />
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <TextBox x:Name="DestSteamIdBox" FontSize="11" Width="100" IsVisible="False" />
+                <Button x:Name="DestSteamIdSaveButton" Content="Save" Click="DestSteamIdSaveButton_OnClick" IsVisible="False" MinHeight="26" MinWidth="48" />
+                <Button x:Name="DestSteamIdCancelButton" Content="Cancel" Click="DestSteamIdCancelButton_OnClick" IsVisible="False" MinHeight="26" MinWidth="48" />
+              </StackPanel>
+            </StackPanel>
+          </Grid>
+          <TextBlock x:Name="DestSlotCountText" Classes="panel-slot-count" Grid.Row="1" Margin="0,0,0,8" />
+          <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8" Margin="0,0,0,8">
+            <Button Content="Load Save" Classes="slot-action" Click="DestLoadButton_OnClick" Grid.Column="0" Margin="0" />
+            <Button Content="Save" Classes="slot-action" Click="DestSaveButton_OnClick" Grid.Column="1" Margin="0" />
+            <TextBlock x:Name="DestSaveSuccessText" Classes="save-success" IsVisible="False" Text="Saved ✓" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,8,0" />
+            <Button x:Name="DestSteamIdEditButton" Content="Edit Steam ID" Classes="slot-action" Click="DestSteamIdEditButton_OnClick" Grid.Column="3" Margin="0" />
+          </Grid>
+          <Border x:Name="DestErrorBanner" Classes="error-banner" Grid.Row="3" IsVisible="False">
+            <TextBlock x:Name="DestErrorText" Text="" />
+          </Border>
+          <Grid x:Name="DestDropPanel" Grid.Row="4" DragDrop.AllowDrop="True">
+            <TextBlock x:Name="DestPathText" Text="No save loaded" Margin="0,0,0,8" FontSize="12" Foreground="#AAB4C4" />
+            <Border x:Name="DestEmptyState" Classes="empty-state">
+              <TextBlock Text="Drag a save file here&#10;or click Load Save" />
+            </Border>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Hidden">
+              <StackPanel x:Name="DestSlotsPanel" />
+            </ScrollViewer>
+          </Grid>
+        </Grid>
       </Border>
     </Grid>
   </Grid>
