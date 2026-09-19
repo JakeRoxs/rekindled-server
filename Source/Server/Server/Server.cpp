@@ -140,11 +140,12 @@ bool Server::Init() {
     Log("Initializing steam game server api.");
 
     if (!SteamGameServer_Init(0, Config.LoginServerPort, MASTERSERVERUPDATERPORT_USEGAMESOCKETSHARE, eServerModeAuthentication, "1.0.0.0")) {
-      Error("Failed to initialize steam game server api.");
-      return false;
+      Warning("Failed to initialize steam game server api. Running without Steam integration.");
+      SteamAvailable = false;
+    } else {
+      Log("Initialized steam game server api.");
+      SteamAvailable = true;
     }
-
-    Log("Initialized steam game server api.");
   }
 
   // Create game interface for this server.
@@ -308,7 +309,7 @@ bool Server::Term() {
     return false;
   }
 
-  if (IsDefaultServer()) {
+  if (IsDefaultServer() && SteamAvailable) {
     SteamGameServer_Shutdown();
   }
 

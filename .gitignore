@@ -103,3 +103,7 @@ copilot-instructions.md
 /.github/skills
 /todos
 /docs
+
+# Docker runtime data
+Saved-ds2/
+Saved-ds3/

@@ -215,18 +215,23 @@ bool AuthClient::Poll() {
       CSteamID SteamIdStruct(SteamIdInt);
 
       if constexpr (BuildConfig::AUTH_ENABLED) {
-        double Start = GetHighResolutionSeconds();
-
-        int AuthResult = SteamGameServer()->BeginAuthSession(Ticket.data(), (int)Ticket.size(), SteamIdStruct);
-        SteamGameServer()->EndAuthSession(SteamIdStruct);
-
-        double Elapsed = GetHighResolutionSeconds() - Start;
-
-        if (AuthResult != k_EBeginAuthSessionResultOK) {
-          WarningS(GetName().c_str(), "Disconnecting client as steam ticket authentication failed with error %i.", AuthResult);
-          return true;
+        // Only validate Steam ticket if Steam API is available
+        if (Service->GetServer()->IsDefaultServer() && !Service->GetServer()->IsSteamAvailable()) {
+          WarningS(GetName().c_str(), "Skipping Steam ticket validation as Steam API is not available.");
         } else {
-          LogS(GetName().c_str(), "Client steam ticket authenticated successfully in %.2f seconds.", Elapsed);
+          double Start = GetHighResolutionSeconds();
+
+          int AuthResult = SteamGameServer()->BeginAuthSession(Ticket.data(), (int)Ticket.size(), SteamIdStruct);
+          SteamGameServer()->EndAuthSession(SteamIdStruct);
+
+          double Elapsed = GetHighResolutionSeconds() - Start;
+
+          if (AuthResult != k_EBeginAuthSessionResultOK) {
+            WarningS(GetName().c_str(), "Disconnecting client as steam ticket authentication failed with error %i.", AuthResult);
+            return true;
+          } else {
+            LogS(GetName().c_str(), "Client steam ticket authenticated successfully in %.2f seconds.", Elapsed);
+          }
         }
       }
 

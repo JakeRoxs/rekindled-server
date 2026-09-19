@@ -74,6 +74,7 @@ public:
 
   std::string GetId() { return ServerId; }
   bool IsDefaultServer() { return ServerId == "default"; }
+  bool IsSteamAvailable() { return SteamAvailable; }
   ServerManager& GetManager() { return *Manager; }
 
   GameType GetGameType() { return ServerGameType; }
@@ -167,6 +168,8 @@ private:
   constexpr static inline double k_DiscordOriginCooldownMin = 10.0f;
 
   std::unordered_map<uint32_t, double> DiscordOriginCooldown;
+
+  bool SteamAvailable = false;
 
   static inline std::string BonfireThumbnail = "https://i.imgur.com/zyHeayN.png";
   static inline std::string RedSoapstoneThumbnail = "https://i.imgur.com/I251YBN.png";
