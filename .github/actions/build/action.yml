@@ -34,9 +34,8 @@ runs:
 
     - name: Setup MSVC environment (Windows)
       if: runner.os == 'Windows' && inputs.component != 'Managed'
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
+      shell: pwsh
+      run: ./tools/setup-msvc.ps1
 
     - name: Configure compiler cache location
       if: inputs.component != 'Managed' && inputs.compiler-cache == 'true'
@@ -55,9 +54,9 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: ${{ runner.temp }}/compiler-cache
-        key: ${{ runner.os }}-${{ runner.arch }}-${{ inputs.preset }}-compiler-v2-${{ github.sha }}-${{ github.run_attempt }}
+        key: ${{ runner.os }}-${{ runner.arch }}-${{ inputs.preset }}-compiler-v3-${{ github.sha }}-${{ github.run_attempt }}
         restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-${{ inputs.preset }}-compiler-v2-
+          ${{ runner.os }}-${{ runner.arch }}-${{ inputs.preset }}-compiler-v3-
 
     - name: Install sccache (Windows)
       if: runner.os == 'Windows' && inputs.component != 'Managed' && inputs.compiler-cache == 'true'
