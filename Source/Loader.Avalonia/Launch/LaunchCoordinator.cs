@@ -114,6 +114,7 @@ namespace Loader
     }
 
     private readonly ILaunchPlatformServices _platformServices;
+    private readonly IWindowsLaunchService _windowsLaunchService;
     private static readonly char[] PathTrimChars = new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar };
     private const string SteamAppIdFileName = "steam_appid.txt";
     private const string ProtonInjectorScriptsDirectory = "scripts";
@@ -127,8 +128,14 @@ namespace Loader
     }
 
     internal LaunchCoordinator(ILaunchPlatformServices platformServices)
+        : this(platformServices, new WindowsLaunchService())
+    {
+    }
+
+    internal LaunchCoordinator(ILaunchPlatformServices platformServices, IWindowsLaunchService windowsLaunchService)
     {
       _platformServices = platformServices ?? throw new ArgumentNullException(nameof(platformServices));
+      _windowsLaunchService = windowsLaunchService ?? throw new ArgumentNullException(nameof(windowsLaunchService));
     }
 
     public bool CanLaunchOnCurrentPlatform => _platformServices.CanLaunchOnCurrentPlatform;
@@ -154,7 +161,7 @@ namespace Loader
 
       if (_platformServices.IsWindows)
       {
-        return TryExecuteWindowsLaunch(server, exePath, gameType, useSeparateSaves, out message);
+        return TryExecuteWindowsLaunch(server, exePath, loadConfig, useSeparateSaves, out message);
       }
 
       if (_platformServices.IsLinux)
@@ -197,24 +204,14 @@ namespace Loader
     private bool TryExecuteWindowsLaunch(
         ServerConfig server,
         string exePath,
-        GameType gameType,
+        DarkSoulsLoadConfig loadConfig,
         bool useSeparateSaves,
         out string message)
     {
-#if WINDOWS
-      string exeDirectory = _platformServices.GetDirectoryName(exePath) ?? string.Empty;
-      string simpleHash = _platformServices.GetExeSimpleHash(exePath);
-
-      if (!_platformServices.TryGetLoadConfiguration(simpleHash, out DarkSoulsLoadConfig loadConfig))
-      {
-        message = "Could not determine game executable version support.";
-        return false;
-      }
-
       string machinePublicIp = _platformServices.GetMachineIPv4(true);
       string machinePrivateIp = _platformServices.GetMachineIPv4(false);
 
-      bool success = WindowsLaunchService.TryLaunch(
+      bool success = _windowsLaunchService.TryLaunch(
           server,
           exePath,
           machinePublicIp,
@@ -231,10 +228,6 @@ namespace Loader
 
       message = $"Game launched successfully for '{server.Name}'.";
       return true;
-#else
-      message = "Windows launch is only available when built for Windows.";
-      return false;
-#endif
     }
 
     private bool TryExecuteLinuxLaunch(

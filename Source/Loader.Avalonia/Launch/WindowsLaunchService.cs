@@ -1,4 +1,3 @@
-#if WINDOWS
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -7,7 +6,7 @@ using System.Threading;
 
 namespace Loader
 {
-  internal static class WindowsLaunchService
+  internal sealed class WindowsLaunchService : IWindowsLaunchService
   {
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct STARTUPINFO
@@ -105,7 +104,7 @@ namespace Loader
       uint dwCreationFlags,
       IntPtr lpThreadId);
 
-    public static bool TryLaunch(
+    public bool TryLaunch(
       ServerConfig config,
       string exeLocation,
       string machinePublicIp,
@@ -114,6 +113,12 @@ namespace Loader
       DarkSoulsLoadConfig loadConfig,
       out string? errorMessage)
     {
+      if (!OperatingSystem.IsWindows())
+      {
+        errorMessage = "Windows launch is only available on Windows.";
+        return false;
+      }
+
       if (string.IsNullOrEmpty(config.PublicKey))
       {
         errorMessage = "no_public_key_available";
@@ -359,4 +364,3 @@ namespace Loader
     }
   }
 }
-#endif
