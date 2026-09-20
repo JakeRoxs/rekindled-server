@@ -206,14 +206,22 @@ ctest --preset linux-release
 
 Native outputs are in `intermediate/cmake/<preset>/bin/<configuration>/`;
 loader outputs are in `bin/managed/<os>/<project>/`. Combined Windows builds
-place `Injector.dll` beside both loaders. Linux game launch also requires the
-external `proton-injector` helper and a Windows injector DLL.
+place `Injector.dll` beside both loaders. Linux game launch also requires
+`proton-injector` and a Windows injector DLL.
 
 ## Packaging
 
 After a Release build, run `tools/generate_package_windows.bat` on Windows or
 `bash tools/generate_package_linux.sh` on Linux. Both assemble a release in
 `rekindled-server/`.
+
+Initialize dependencies with `git submodule update --init --recursive` before
+packaging. Linux packaging also requires `mingw-w64` and `make`; it builds the
+pinned `Source/ThirdParty/proton-injector` submodule and bundles its launch
+script, 32/64-bit helper executables, and MIT license beside the Avalonia loader.
+Direct `dotnet publish` does not build or bundle this helper. Development setups
+can still use `REKINDLED_PROTON_INJECTOR_ROOT` or
+`REKINDLED_PROTON_INJECTOR_SCRIPT` to select an external copy.
 
 Packaging defaults to the `windows-release` or `linux-release` native preset.
 Set `NATIVE_BUILD_PRESET` when using another preset, such as

@@ -1,3 +1,6 @@
 [submodule "Source/ThirdParty/SoulsFormats"]
 	path = Source/ThirdParty/SoulsFormats
 	url = https://github.com/soulsmods/SoulsFormatsNEXT.git
+[submodule "Source/ThirdParty/proton-injector"]
+	path = Source/ThirdParty/proton-injector
+	url = https://github.com/jokelbaf/proton-injector.git

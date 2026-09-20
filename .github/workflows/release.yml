@@ -63,6 +63,13 @@ jobs:
           cd "${{ github.workspace }}"
           ./tools/generate_package_windows.bat
 
+      - name: Install proton-injector build dependencies
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mingw-w64 make
+
       - name: Package Release (Linux)
         if: matrix.platform == 'linux'
         shell: bash

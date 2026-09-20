@@ -18,6 +18,23 @@ if [ ! -f "$OUTPUT_ROOT/Server" ]; then
   exit 1
 fi
 
+# Build the pinned helper afresh so reused workspaces cannot package stale binaries.
+PROTON_INJECTOR_SOURCE="$REPO_ROOT/Source/ThirdParty/proton-injector"
+PROTON_INJECTOR_OUTPUT="$REPO_ROOT/intermediate/proton-injector"
+if [ ! -f "$PROTON_INJECTOR_SOURCE/Makefile" ]; then
+  echo "ERROR: Initialize submodules with git submodule update --init --recursive."
+  exit 1
+fi
+for tool in make i686-w64-mingw32-gcc x86_64-w64-mingw32-gcc; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "ERROR: $tool is required to package proton-injector. Install mingw-w64 and make."
+    exit 1
+  fi
+done
+make -B -C "$PROTON_INJECTOR_SOURCE" \
+  BUILD_DIR="$PROTON_INJECTOR_OUTPUT/build" \
+  BIN_DIR="$PROTON_INJECTOR_OUTPUT/bin" all
+
 if [ "${SKIP_DOTNET_PUBLISH:-0}" != "1" ]; then
   echo "Publishing Loader.Avalonia artifacts with canonical package-script settings..."
   dotnet publish Source/Loader.Avalonia/Loader.Avalonia.csproj \
@@ -108,7 +125,16 @@ else
   ERR=1
 fi
 
-for notice in LICENSE MIT-NOTICE.txt licenses/SoulsFormatsNEXT-GPLv3.txt licenses/Rekindled-MIT.txt licenses/Detours-MIT.txt licenses/FamFamFam-Silk.txt; do
+PROTON_INJECTOR_PACKAGE="rekindled-server/Loader.Avalonia/proton-injector"
+mkdir -p "$PROTON_INJECTOR_PACKAGE/scripts" "$PROTON_INJECTOR_PACKAGE/bin"
+copy_with_log "$PROTON_INJECTOR_SOURCE/scripts/inject.sh" "$PROTON_INJECTOR_PACKAGE/scripts/inject.sh"
+chmod +x "$PROTON_INJECTOR_PACKAGE/scripts/inject.sh"
+copy_with_log "$PROTON_INJECTOR_OUTPUT/bin/injector32.exe" "$PROTON_INJECTOR_PACKAGE/bin/injector32.exe"
+copy_with_log "$PROTON_INJECTOR_OUTPUT/bin/injector64.exe" "$PROTON_INJECTOR_PACKAGE/bin/injector64.exe"
+copy_with_log "$PROTON_INJECTOR_SOURCE/LICENSE" "$PROTON_INJECTOR_PACKAGE/LICENSE"
+copy_with_log "$PROTON_INJECTOR_SOURCE/README.md" "$PROTON_INJECTOR_PACKAGE/README.md"
+
+for notice in LICENSE MIT-NOTICE.txt licenses/SoulsFormatsNEXT-GPLv3.txt licenses/Rekindled-MIT.txt licenses/Detours-MIT.txt licenses/FamFamFam-Silk.txt proton-injector/LICENSE; do
   if [ ! -f "rekindled-server/Loader.Avalonia/$notice" ]; then
     echo "ERROR: Missing Avalonia loader notice $notice. Republish the loader before packaging."
     ERR=1

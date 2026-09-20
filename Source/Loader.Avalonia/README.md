@@ -20,7 +20,9 @@ directory to the installation directory and run `Loader.Avalonia.exe` on
 Windows or `./Loader.Avalonia` on Linux.
 
 Game launching also needs the Windows `Injector.dll` beside the loader;
-Linux additionally needs the external `proton-injector` helper. See the
+Linux additionally needs the `proton-injector` helper, bundled by Linux release
+packaging from the pinned submodule. Direct publishes need a separately built
+helper selected through `REKINDLED_PROTON_INJECTOR_ROOT`. See the
 repository root `README.md`, under "How do I build it?", for native build
 prerequisites, combined builds, and packaging instructions. Publishing the
 managed application alone does not build those native components.
