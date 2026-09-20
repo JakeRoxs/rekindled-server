@@ -25,6 +25,7 @@ env:
 jobs:
   build:
     name: Build (matrix)
+    timeout-minutes: 45
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read

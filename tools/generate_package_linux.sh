@@ -61,7 +61,9 @@ copy_with_log() {
 
 copy_dir_with_log() {
   echo "Including directory: $1 -> $2"
-  cp -R "$1" "$2"
+  # Copy contents even when the destination directory already exists.
+  mkdir -p "$2"
+  cp -R "$1/." "$2"
 }
 
 rm -rf rekindled-server
