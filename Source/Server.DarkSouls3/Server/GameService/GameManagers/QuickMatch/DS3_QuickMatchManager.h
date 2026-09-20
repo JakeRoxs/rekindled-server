@@ -13,6 +13,7 @@
 #include "Server/GameService/GameManager.h"
 #include "Protobuf/DS3_Protobufs.h"
 #include "Server/GameService/Utils/DS3_GameIds.h"
+#include <cstdint>
 
 struct Frpg2ReliableUdpMessage;
 class Server;

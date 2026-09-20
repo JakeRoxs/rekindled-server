@@ -12,6 +12,7 @@
 
 #include <vector>
 #include <memory>
+#include <cstdint>
 
 #include "Server/Streams/Frpg2UdpPacket.h"
 

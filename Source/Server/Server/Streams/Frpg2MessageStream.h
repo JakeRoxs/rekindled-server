@@ -14,6 +14,7 @@
 #include "Server/Streams/Frpg2Message.h"
 
 #include "Protobuf/SharedProtobufs.h"
+#include <cstdint>
 
 class RSAKeyPair;
 class Cipher;

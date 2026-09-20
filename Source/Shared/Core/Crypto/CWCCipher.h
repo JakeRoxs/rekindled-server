@@ -15,6 +15,7 @@
 #include "cwc.h"
 
 #include <vector>
+#include <cstdint>
 
 class CWCCipher
     : public Cipher {

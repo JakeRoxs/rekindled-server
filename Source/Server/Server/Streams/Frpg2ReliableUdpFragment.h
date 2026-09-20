@@ -13,6 +13,7 @@
 #include "Shared/Core/Utils/Endian.h"
 
 #include <vector>
+#include <cstdint>
 
 // See ds3server_packet.bt for commentry on what each of these
 // fields appears to represent.

@@ -14,6 +14,7 @@
 #include "Shared/Core/Crypto/RSAKeyPair.h"
 
 #include <vector>
+#include <cstdint>
 
 class RSACipher
     : public Cipher {

@@ -11,6 +11,7 @@
 #pragma once
 
 #include "Server/GameService/Utils/DS2_GameIds.h"
+#include <cstdint>
 
 struct DS2_CellAndAreaId {
   uint64_t CellId;

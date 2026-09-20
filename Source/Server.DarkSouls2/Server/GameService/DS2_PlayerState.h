@@ -16,6 +16,7 @@
 #include "Server/GameService/Utils/DS2_GameIds.h"
 
 #include "Server/GameService/PlayerState.h"
+#include <cstdint>
 
 #define DEFINE_FIELD(type, name, default_value) \
 private:                                        \

@@ -18,6 +18,7 @@
 #include <vector>
 #include <string>
 #include <atomic>
+#include <cstdint>
 
 #include <google/protobuf/message_lite.h>
 

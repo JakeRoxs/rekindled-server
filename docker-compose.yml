@@ -7,6 +7,7 @@ services:
       - "50010:50010/udp" # game
       - "50050:50050/udp" # login
       - "50005:50005" # admin WebUI
+    # Prepare this host directory with ownership 1000:1000 before starting.
     volumes:
       - ./Saved-ds3:/opt/rekindled-ds3-server/Saved
     # Optional environment variables (override values from config.json):
@@ -53,6 +54,7 @@ services:
       - "51010:50010/udp" # game
       - "51050:50050/udp" # login
       - "51005:50005" # admin WebUI
+    # Prepare this host directory with ownership 1000:1000 before starting.
     volumes:
       - ./Saved-ds2:/opt/rekindled-ds2s-server/Saved
     # Optional environment variables (override values from config.json):

@@ -12,6 +12,7 @@
 
 #include <vector>
 #include <stdexcept>
+#include <cstdint>
 
 class PropertyList {
 public:
