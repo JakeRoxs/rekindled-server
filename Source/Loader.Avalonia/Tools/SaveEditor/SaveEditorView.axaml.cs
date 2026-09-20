@@ -46,7 +46,7 @@ namespace Loader.Tools.SaveEditor
             public string SlotData { get; set; } = "";
         }
 
-        private static readonly string BankPath = Path.Combine(
+        private static readonly string BankPath = Path.Join(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "RekindledServer",
             "save-editor-bank.json");
@@ -71,10 +71,11 @@ namespace Loader.Tools.SaveEditor
                         BankPanel.Children.Add(card);
                         _bank.Add(new BankEntry(slot, card, dtos.IndexOf(dto)));
                     }
-                    catch { /* Skip invalid entries */ }
+                    catch (Exception) { /* Skip invalid entries */ }
                 }
             }
-            catch { /* Reset to empty if file is corrupted */ }
+            catch (IOException) { /* Reset to empty if file is corrupted or unreadable */ }
+            catch (JsonException) { /* Reset to empty if file is corrupted */ }
         }
 
         private void SaveBank()
@@ -96,7 +97,9 @@ namespace Loader.Tools.SaveEditor
 
                 File.WriteAllText(BankPath, JsonSerializer.Serialize(dtos, new JsonSerializerOptions { WriteIndented = true }));
             }
-            catch { /* Ignore save errors */ }
+            catch (IOException) { /* Ignore save errors */ }
+            catch (UnauthorizedAccessException) { /* Ignore save errors */ }
+            catch (JsonException) { /* Ignore save errors */ }
         }
 
         public SaveEditorView()
