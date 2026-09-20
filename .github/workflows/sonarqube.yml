@@ -27,6 +27,8 @@ env:
 jobs:
   sonar-loader:
     name: SonarQube Loader (C#)
+    # Keep bot-created PRs skipped even when a human updates them.
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.type != 'Bot'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -153,6 +155,7 @@ jobs:
 
   sonar-server:
     name: SonarQube Server (C++)
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     steps:
       - name: Validate SonarQube settings
@@ -221,6 +224,7 @@ jobs:
 
   sonar-hub:
     name: SonarQube Hub (JavaScript)
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     steps:
       - name: Validate SonarQube settings
