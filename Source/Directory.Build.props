@@ -3,5 +3,6 @@
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..'))</RepoRoot>
     <BaseIntermediateOutputPath>$(RepoRoot)/intermediate/dotnet/$(OS)/$(MSBuildProjectName)/$(Platform)/$(Configuration)/</BaseIntermediateOutputPath>
     <BaseOutputPath>$(RepoRoot)/bin/managed/$(OS)/$(MSBuildProjectName)/</BaseOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);$(MSBuildProjectDirectory)/obj/**</DefaultItemExcludes>
   </PropertyGroup>
 </Project>

@@ -41,6 +41,15 @@ mkdir "rekindled-server\Server"
 mkdir "rekindled-server\Prerequisites"
 echo Including: Resources\ReadMe.txt -> rekindled-server\ReadMe.txt
 copy Resources\ReadMe.txt rekindled-server\ReadMe.txt
+copy /y LICENSE rekindled-server\LICENSE
+if errorlevel 1 exit /b 1
+mkdir "rekindled-server\licenses"
+copy /y Source\ThirdParty\protobuf-2.6.1rc1\LICENSE rekindled-server\licenses\Protobuf.txt
+if errorlevel 1 exit /b 1
+copy /y Source\ThirdParty\aes\license.txt rekindled-server\licenses\AES.txt
+if errorlevel 1 exit /b 1
+copy /y Source\ThirdParty\detours\LICENSE.md rekindled-server\licenses\Detours.txt
+if errorlevel 1 exit /b 1
 if exist "Resources\Prerequisites" (
     echo Including directory: Resources\Prerequisites -> rekindled-server\Prerequisites
     xcopy /s Resources\Prerequisites rekindled-server\Prerequisites
@@ -109,6 +118,13 @@ if exist "%LOADER_AVALONIA_WINDOWS_PUBLISH_DIR%\Loader.Avalonia.exe" (
     set ERR=1
 )
 :loader_avalonia_done
+
+for %%F in (LICENSE MIT-NOTICE.txt licenses\SoulsFormatsNEXT-GPLv3.txt licenses\Rekindled-MIT.txt licenses\Detours-MIT.txt licenses\FamFamFam-Silk.txt) do (
+    if not exist "rekindled-server\Loader.Avalonia\%%F" (
+        echo ERROR: Missing Avalonia loader notice %%F. Republish the loader before packaging.
+        set ERR=1
+    )
+)
 
 if exist "%LOADER_AVALONIA_WINDOWS_PUBLISH_DIR%\Loader.Avalonia.pdb" (
     xcopy /s "%LOADER_AVALONIA_WINDOWS_PUBLISH_DIR%\Loader.Avalonia.pdb" rekindled-server\Loader.Avalonia\

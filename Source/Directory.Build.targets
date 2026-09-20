@@ -1,4 +1,21 @@
 <Project>
+  <!-- Keep notices outside single-file bundles and include them in direct builds/publishes. -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Loader' or '$(MSBuildProjectName)' == 'Loader.Avalonia'">
+    <Content Include="$(RepoRoot)/LICENSE" Link="licenses/Rekindled-MIT.txt"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="$(RepoRoot)/Source/ThirdParty/detours/LICENSE.md" Link="licenses/Detours-MIT.txt"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="$(RepoRoot)/Resources/famfamfam_silk_icons_v013/readme.txt" Link="licenses/FamFamFam-Silk.txt"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Loader.Avalonia'">
+    <Content Include="$(RepoRoot)/Source/Loader.Avalonia/LICENSE" Link="LICENSE"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="$(RepoRoot)/Source/Loader.Avalonia/MIT-NOTICE.txt" Link="MIT-NOTICE.txt"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="$(RepoRoot)/Source/ThirdParty/SoulsFormats/LICENSE" Link="licenses/SoulsFormatsNEXT-GPLv3.txt"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
   <!-- All-component builds provide the exact native output tree. Managed-only
        builds do not search for or copy an injector from an older build. -->
   <Target Name="CopyRekindledInjector" AfterTargets="Build"

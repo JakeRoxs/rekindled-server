@@ -53,6 +53,11 @@ mkdir -p rekindled-server/Server
 mkdir -p rekindled-server/Loader
 mkdir -p rekindled-server/Loader.Avalonia
 copy_with_log Resources/ReadMe.txt rekindled-server/ReadMe.txt
+copy_with_log LICENSE rekindled-server/LICENSE
+mkdir -p rekindled-server/licenses
+copy_with_log Source/ThirdParty/protobuf-2.6.1rc1/LICENSE rekindled-server/licenses/Protobuf.txt
+copy_with_log Source/ThirdParty/aes/license.txt rekindled-server/licenses/AES.txt
+copy_with_log Source/ThirdParty/detours/LICENSE.md rekindled-server/licenses/Detours.txt
 
 ERR=0
 
@@ -102,6 +107,13 @@ else
   echo "WARNING: Loader.Avalonia output not found in canonical publish dir: $LOADER_AVALONIA_LINUX_PUBLISH_DIR"
   ERR=1
 fi
+
+for notice in LICENSE MIT-NOTICE.txt licenses/SoulsFormatsNEXT-GPLv3.txt licenses/Rekindled-MIT.txt licenses/Detours-MIT.txt licenses/FamFamFam-Silk.txt; do
+  if [ ! -f "rekindled-server/Loader.Avalonia/$notice" ]; then
+    echo "ERROR: Missing Avalonia loader notice $notice. Republish the loader before packaging."
+    ERR=1
+  fi
+done
 
 if [ "$ERR" -eq 1 ]; then
   echo "ERROR: One or more required files were missing. Check build output path and CMake configuration."

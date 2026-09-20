@@ -1,6 +1,6 @@
 ![Rekindled Server](./Resources/banner.png?raw=true)
 
-![GitHub license](https://img.shields.io/github/license/jakeroxs/rekindled-server)
+[![License: MIT / GPLv3](https://img.shields.io/badge/license-MIT%20%2F%20GPLv3-blue)](#license)
 ![GitHub release](https://img.shields.io/github/release/jakeroxs/rekindled-server)
 ![GitHub downloads](https://img.shields.io/github/downloads/jakeroxs/rekindled-server/total)
 
@@ -260,6 +260,11 @@ them properly, or finding out the format of the data they need to return would b
 
 There are also a lot of protobuf fields that are still unknown and use constant values when sent from the
 server, determining what they represent would be a good improvement.
+
+# License
+
+[MIT](LICENSE), except the [Avalonia loader](Source/Loader.Avalonia/LICENSE)
+(GPLv3). Third-party components retain their own licenses.
 
 # Credit
 
