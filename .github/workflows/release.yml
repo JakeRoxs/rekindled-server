@@ -1,4 +1,5 @@
 name: Release
+run-name: Release v${{ inputs.version }}${{ inputs.version_postfix }}
 
 on:
   workflow_dispatch:
