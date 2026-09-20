@@ -43,12 +43,14 @@ jobs:
     name: Trigger SonarQube workflow
     # SonarQube already handles pushes and PRs targeting main itself.
     # Dispatch only repository refs; fork and Dependabot PRs have read-only tokens.
+    # Check the PR author too, so human updates do not enable bot-created PRs.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/development') ||
       (github.event_name == 'pull_request' &&
        github.base_ref == 'development' &&
        github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.user.type != 'Bot' &&
        github.actor != 'dependabot[bot]')
     runs-on: ubuntu-latest
     permissions:
