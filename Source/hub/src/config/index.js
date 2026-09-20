@@ -12,17 +12,17 @@ function parsePositiveInt(envVar, fallback) {
 }
 
 const port = (() => {
-    const env = process.env.MASTER_SERVER_PORT;
+    const env = process.env.HUB_PORT;
     return parsePositiveInt(env, fileConfig.port);
 })();
 
 const pollIntervalMs = (() => {
-    const env = process.env.MASTER_SERVER_POLL_INTERVAL_MS;
+    const env = process.env.HUB_POLL_INTERVAL_MS;
     return parsePositiveInt(env, fileConfig.poll_interval_ms || 30000);
 })();
 
 const serverTimeoutMs = (() => {
-    const env = process.env.MASTER_SERVER_TIMEOUT_MS;
+    const env = process.env.HUB_TIMEOUT_MS;
     return parsePositiveInt(env, fileConfig.server_timeout_ms);
 })();
 
@@ -48,7 +48,7 @@ function parseCorsOrigins(value) {
 }
 
 const corsOrigins = (() => {
-    const env = process.env.MASTER_SERVER_CORS_ORIGINS;
+    const env = process.env.HUB_CORS_ORIGINS;
     const fileCorsOrigins = fileConfig.cors_origins;
     return parseCorsOrigins(env ?? fileCorsOrigins);
 })();
@@ -58,4 +58,6 @@ module.exports = {
     pollIntervalMs,
     serverTimeoutMs,
     corsOrigins,
+    showShardingAllowList:
+        process.env.HUB_SHOW_SHARDING_ALLOWLIST === "true",
 };

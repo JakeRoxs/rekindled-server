@@ -1,7 +1,8 @@
 const assert = require("node:assert");
 const test = require("node:test");
 
-process.env.MASTER_SERVER_WRITE_SECRET = "test-secret";
+process.env.HUB_WRITE_SECRET = "test-secret";
+delete process.env.HUB_SHOW_SHARDING_ALLOWLIST;
 process.env.SHARDING_ALLOWLIST =
   "https://allowed.example,https://allowed2.example";
 
@@ -30,7 +31,7 @@ async function req(path, opts = {}) {
   const { method = "GET", body, headers = {}, auth } = opts;
   const finalHeaders = { ...headers };
   if (auth !== undefined) {
-    finalHeaders["x-master-server-write-secret"] = auth;
+    finalHeaders["x-hub-write-secret"] = auth;
   }
   if (body !== undefined) {
     finalHeaders["content-type"] = "application/json";
@@ -77,6 +78,8 @@ test("GET / renders the dashboard", async () => {
   const r = await req("/");
   assert.strictEqual(r.status, 200);
   assert.match(r.text, /<html/i);
+  assert.ok(!r.text.includes("allowed.example"));
+  assert.ok(!r.text.includes('id="allowedShardList"'));
 });
 
 test("GET /api/v1/servers returns success with a list", async () => {
@@ -91,7 +94,8 @@ test("GET /api/v1/servers/status returns status data", async () => {
   assert.strictEqual(r.status, 200);
   assert.strictEqual(r.json.status, "success");
   assert.ok(typeof r.json.statusData.activeServerCount === "number");
-  assert.ok(Array.isArray(r.json.statusData.shardingAllowList));
+  assert.ok(!Object.hasOwn(r.json.statusData, "shardingAllowList"));
+  assert.ok(!r.text.includes("allowed.example"));
 });
 
 test("POST /api/v1/servers rejects an incorrect secret", async () => {
@@ -256,4 +260,23 @@ test("DELETE /api/v1/servers rejects an incorrect secret", async () => {
     auth: "wrong-secret",
   });
   assert.strictEqual(r.status, 401);
+});
+
+
+test("allowlist opt-in publishes entries in HTML and status API", async () => {
+  const config = require("../config");
+  const previous = config.showShardingAllowList;
+  config.showShardingAllowList = true;
+  try {
+    const page = await req("/");
+    assert.strictEqual(page.status, 200);
+    assert.match(page.text, /id="allowedShardList"/);
+    assert.match(page.text, /<li>https:\/\/allowed.example<\/li>/);
+    const status = await req("/api/v1/servers/status");
+    assert.deepStrictEqual(status.json.statusData.shardingAllowList, [
+      "https://allowed.example", "https://allowed2.example"
+    ]);
+  } finally {
+    config.showShardingAllowList = previous;
+  }
 });

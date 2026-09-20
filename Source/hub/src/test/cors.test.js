@@ -1,8 +1,8 @@
 const assert = require("node:assert");
 const test = require("node:test");
 
-process.env.MASTER_SERVER_WRITE_SECRET = "test-secret";
-process.env.MASTER_SERVER_CORS_ORIGINS = "https://ok.com";
+process.env.HUB_WRITE_SECRET = "test-secret";
+process.env.HUB_CORS_ORIGINS = "https://ok.com";
 
 const app = require("../index");
 
@@ -58,7 +58,7 @@ test("CORS allows requests without an origin header", async () => {
 });
 
 test("CORS wildcard policy allows any origin", async () => {
-  process.env.MASTER_SERVER_CORS_ORIGINS = "*";
+  process.env.HUB_CORS_ORIGINS = "*";
   delete require.cache[require.resolve("../config")];
   delete require.cache[require.resolve("../routes/api/v1/servers")];
   delete require.cache[require.resolve("../index")];

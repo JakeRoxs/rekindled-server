@@ -42,29 +42,29 @@ test("config uses file defaults when no env is set", () => {
 });
 
 test("config overrides port from env", () => {
-  const config = loadConfig({ MASTER_SERVER_PORT: "8080" });
+  const config = loadConfig({ HUB_PORT: "8080" });
   assert.strictEqual(config.port, 8080);
 });
 
 test("config falls back on invalid port values", () => {
   assert.strictEqual(
-    loadConfig({ MASTER_SERVER_PORT: "not-a-number" }).port,
+    loadConfig({ HUB_PORT: "not-a-number" }).port,
     50020,
   );
   assert.strictEqual(
-    loadConfig({ MASTER_SERVER_PORT: "0" }).port,
+    loadConfig({ HUB_PORT: "0" }).port,
     50020,
   );
   assert.strictEqual(
-    loadConfig({ MASTER_SERVER_PORT: "-1" }).port,
+    loadConfig({ HUB_PORT: "-1" }).port,
     50020,
   );
 });
 
 test("config overrides poll interval and timeout from env", () => {
   const config = loadConfig({
-    MASTER_SERVER_POLL_INTERVAL_MS: "1500",
-    MASTER_SERVER_TIMEOUT_MS: "12345",
+    HUB_POLL_INTERVAL_MS: "1500",
+    HUB_TIMEOUT_MS: "12345",
   });
   assert.strictEqual(config.pollIntervalMs, 1500);
   assert.strictEqual(config.serverTimeoutMs, 12345);
@@ -72,19 +72,27 @@ test("config overrides poll interval and timeout from env", () => {
 
 test("config parses comma-separated CORS origins from env", () => {
   const config = loadConfig({
-    MASTER_SERVER_CORS_ORIGINS: " https://a.com , https://b.com ",
+    HUB_CORS_ORIGINS: " https://a.com , https://b.com ",
   });
   assert.deepStrictEqual(config.corsOrigins, ["https://a.com", "https://b.com"]);
 });
 
 test("config trims and drops empty CORS origins", () => {
   const config = loadConfig({
-    MASTER_SERVER_CORS_ORIGINS: "https://a.com,, ,",
+    HUB_CORS_ORIGINS: "https://a.com,, ,",
   });
   assert.deepStrictEqual(config.corsOrigins, ["https://a.com"]);
 });
 
 test("config returns empty CORS origins for blank env", () => {
-  const config = loadConfig({ MASTER_SERVER_CORS_ORIGINS: "" });
+  const config = loadConfig({ HUB_CORS_ORIGINS: "" });
   assert.deepStrictEqual(config.corsOrigins, []);
+});
+
+
+test("sharding allowlist publication requires explicit true", () => {
+  for (const value of [undefined, "", "false", "1", "TRUE", "invalid"]) {
+    assert.strictEqual(loadConfig({ HUB_SHOW_SHARDING_ALLOWLIST: value }).showShardingAllowList, false);
+  }
+  assert.strictEqual(loadConfig({ HUB_SHOW_SHARDING_ALLOWLIST: "true" }).showShardingAllowList, true);
 });

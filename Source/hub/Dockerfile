@@ -11,13 +11,13 @@ COPY package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci --only=production; else npm install --only=production; fi \
     && npm cache clean --force \
     && apk add --no-cache curl \
-    && addgroup -S master && adduser -S master -G master \
-    && chown -R master:master /app
+    && addgroup -S hub && adduser -S hub -G hub \
+    && chown -R hub:hub /app
 
 # copy the rest of the source tree
 COPY . .
 
-USER master
+USER hub
 
 # expose the api port for documentation
 EXPOSE 50020/tcp

@@ -1,5 +1,5 @@
 {
-  "name": "masterserver",
+  "name": "rekindled-hub",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -7,7 +7,7 @@
     "start": "node src/index.js",
     "start:dev": "nodemon src/index.js",
     "test": "node --test",
-    "package": "rimraf ../../Bin/MasterServer && mkdirp ../../Bin/MasterServer && npx pkg --targets node18-win-x64 -o ../../Bin/MasterServer/MasterServer.exe ./src/index.js"
+    "package": "rimraf ../../Bin/Hub && mkdirp ../../Bin/Hub && npx pkg --targets node18-win-x64 -o ../../Bin/Hub/Hub.exe ./src/index.js"
   },
   "author": "",
   "license": "MIT",

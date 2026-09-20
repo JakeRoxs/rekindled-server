@@ -5,307 +5,268 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta
             name="description"
-            content="Rekindled Hub status dashboard for Rekindled Server. Monitor active servers and health in real-time."
+            content="Rekindled Hub status dashboard for Rekindled Server. View registered servers and service information."
         />
         <meta property="og:title" content="Rekindled Hub" />
         <meta
             property="og:description"
-            content="Live status and server listing for the Rekindled Hub."
+            content="Rekindled Hub service status and registered game servers."
         />
         <meta property="og:type" content="website" />
         <title>Rekindled Hub</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap"
-            rel="stylesheet"
-        />
         <style>
             :root {
-                --bg: linear-gradient(
-                    180deg,
-                    #0b1220 0%,
-                    #111826 46%,
-                    #0e1324 100%
-                );
-                --surface: #111a2c;
-                --surface-alt: #16213c;
-                --text: #e8f2ff;
-                --muted: #a8b6d2;
-                --accent: #69c0ff;
-                --accent-2: #8dd4ff;
-                --border: rgba(255, 255, 255, 0.12);
-                --line: #24324d;
-                --radius: 14px;
-                --shadow: 0 18px 36px rgba(0, 0, 10, 0.45);
-                --max-width: 1200px;
-                --focus: #5dc5ff;
+                color-scheme: dark;
+                --bg: #101419;
+                --surface: #191f27;
+                --surface-alt: #202833;
+                --text: #e6eaf0;
+                --muted: #a4afbd;
+                --accent: #90b9e8;
+                --border: #343e4a;
+                --error: #ffb4ac;
             }
-
-            html {
-                scroll-behavior: smooth;
+            .light {
+                color-scheme: light;
+                --bg: #f3f5f7;
+                --surface: #fff;
+                --surface-alt: #edf1f5;
+                --text: #202b38;
+                --muted: #536273;
+                --accent: #235e99;
+                --border: #ced6df;
+                --error: #a52b22;
             }
-
+            * {
+                box-sizing: border-box;
+            }
             body {
                 margin: 0;
-                min-height: 100vh;
                 background: var(--bg);
                 color: var(--text);
-                font-family:
-                    "Outfit",
-                    ui-sans-serif,
-                    system-ui,
-                    -apple-system,
-                    BlinkMacSystemFont,
-                    "Segoe UI",
-                    sans-serif;
-                line-height: 1.55;
+                font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+                line-height: 1.6;
             }
-
-            .skip-link {
-                position: absolute;
-                top: -40px;
-                left: 16px;
-                background: rgba(17, 33, 59, 0.95);
-                color: #e5f2ff;
-                padding: 8px 12px;
-                border-radius: 8px;
-                z-index: 99;
-                font-size: 14px;
-                text-decoration: none;
-                transition: top 160ms ease;
+            a {
+                color: var(--accent);
+                text-underline-offset: 3px;
             }
-
-            .skip-link:focus {
-                top: 16px;
-                outline: 2px solid var(--focus);
+            :focus-visible {
+                outline: 2px solid var(--accent);
                 outline-offset: 4px;
             }
-
-            header {
-                padding: 44px 24px 16px;
-                text-align: left;
-                max-width: var(--max-width);
-                margin: auto;
+            [hidden] {
+                display: none !important;
             }
-
+            .skip-link {
+                position: absolute;
+                top: -80px;
+                left: 20px;
+                padding: 10px;
+                background: var(--surface);
+            }
+            .skip-link:focus {
+                top: 12px;
+            }
+            body > header, .page, footer {
+                max-width: 1160px;
+                margin: auto;
+                padding: 24px;
+            }
+            body > header {
+                padding-top: 48px;
+                padding-right: 160px;
+            }
             h1 {
                 margin: 0;
-                font-size: clamp(2rem, 5vw, 3.2rem);
-                font-weight: 700;
-                letter-spacing: -0.03em;
+                font-size: clamp(1.8rem, 4vw, 2.4rem);
+                letter-spacing: -0.035em;
+                font-weight: 650;
             }
-
             .subtitle {
                 margin: 8px 0 0;
                 color: var(--muted);
-                font-size: 1rem;
-                max-width: 760px;
+                max-width: 680px;
             }
-
-            .page {
-                max-width: var(--max-width);
-                margin: auto;
-                padding: 12px 20px 40px;
-            }
-
             .top-panel {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                gap: 1rem;
-                margin-top: 20px;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 16px;
             }
-
             .panel {
                 background: var(--surface);
                 border: 1px solid var(--border);
-                border-radius: var(--radius);
-                box-shadow: var(--shadow);
-                padding: 20px;
-                display: flex;
-                flex-direction: column;
-                gap: 10px;
-                transition:
-                    transform 220ms ease,
-                    box-shadow 220ms ease,
-                    border-color 220ms ease;
+                border-radius: 10px;
+                padding: 22px;
+                min-width: 0;
             }
-
-            .panel:hover {
-                transform: translateY(-2px);
-                border-color: rgba(105, 192, 255, 0.6);
-            }
-
             .panel h2 {
                 margin: 0;
-                font-size: 0.8rem;
-                text-transform: uppercase;
-                letter-spacing: 0.15em;
+                font-size: .9rem;
+                font-weight: 500;
                 color: var(--muted);
             }
-
-            .panel .metric {
-                font-size: clamp(1.8rem, 4vw, 2.8rem);
-                font-weight: 700;
-                margin: 0;
-            }
-
-            .panel small {
-                color: var(--muted);
-            }
-
-            .meta {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 10px;
-                margin: 24px 0 0;
-                color: var(--muted);
-                font-size: 0.92rem;
-            }
-
-            .meta a {
-                color: var(--accent);
-                text-decoration: none;
+            .metric {
+                margin: 8px 0;
+                font-size: clamp(1.5rem, 3vw, 2.2rem);
                 font-weight: 600;
+                font-variant-numeric: tabular-nums;
+                overflow-wrap: anywhere;
             }
-
-            .meta a:hover,
-            .meta a:focus-visible {
-                text-decoration: underline;
+            small {
+                color: var(--muted);
             }
-
-            .theme-toggle {
-                position: fixed;
-                top: 22px;
-                right: 22px;
-                border-radius: 999px;
-                border: 1px solid rgba(255, 255, 255, 0.18);
-                background: rgba(7, 13, 25, 0.8);
-                color: var(--text);
-                padding: 10px 14px;
-                font-size: 1rem;
-                cursor: pointer;
-                backdrop-filter: blur(9px);
-                z-index: 100;
+            .meta {
+                margin: 20px 0;
+                font-size: .875rem;
+                color: var(--muted);
             }
-
-            .theme-toggle:hover {
-                transform: translateY(-1px);
-            }
-
-            .status-line {
-                display: inline-flex;
-                align-items: center;
-                gap: 10px;
-                font-size: 0.9rem;
-                border-radius: 999px;
-                padding: 8px 12px;
-                border: 1px dashed rgba(255, 255, 255, 0.25);
-                background: rgba(255, 255, 255, 0.04);
-                color: var(--text);
-            }
-
             .status-line.error {
-                border-color: rgba(255, 97, 89, 0.6);
-                background: rgba(255, 97, 89, 0.16);
-                color: #ffd1cf;
+                color: var(--error);
             }
-
+            .configuration {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+                gap: 12px;
+            }
+            details {
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                background: var(--surface);
+                min-width: 0;
+                align-self: start;
+            }
+            summary {
+                padding: 12px 16px;
+                cursor: pointer;
+                font-size: .9rem;
+            }
+            .count {
+                color: var(--muted);
+                margin-left: 8px;
+            }
+            .config-list {
+                max-height: 200px;
+                overflow-y: auto;
+                overscroll-behavior: contain;
+                margin: 0;
+                padding: 0 16px 12px 34px;
+                font-size: .875rem;
+            }
+            .config-list li {
+                padding: 6px 0;
+                overflow-wrap: anywhere;
+            }
+            .theme-toggle {
+                position: absolute;
+                top: 48px;
+                right: max(24px, calc((100vw - 1112px) / 2));
+                padding: 8px 12px;
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                background: var(--surface);
+                color: var(--text);
+                font: inherit;
+                font-size: .85rem;
+                cursor: pointer;
+            }
+            .theme-toggle:hover, summary:hover {
+                background: var(--surface-alt);
+            }
             .server-list {
                 margin-top: 28px;
                 border: 1px solid var(--border);
-                background: var(--surface);
-                border-radius: var(--radius);
+                border-radius: 10px;
                 overflow: hidden;
-                box-shadow: var(--shadow);
+                background: var(--surface);
             }
-
             .server-list header {
-                padding: 14px 18px;
-                border-bottom: 1px solid var(--line);
-                background: rgba(10, 18, 35, 0.22);
-                color: var(--muted);
+                padding: 16px 20px;
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                justify-content: space-between;
+                gap: 16px;
+                align-items: center;
+            }
+            .server-list h2 {
+                margin: 0;
+                font-size: 1rem;
                 font-weight: 600;
             }
-
+            .api-link {
+                font-size: .8rem;
+            }
+            .table-scroll {
+                overflow-x: auto;
+            }
             table {
                 width: 100%;
                 border-collapse: collapse;
+                min-width: 620px;
             }
-
-            thead th {
+            th {
                 text-align: left;
-                font-size: 0.8rem;
+                font-size: .8rem;
+                font-weight: 500;
                 color: var(--muted);
-                padding: 12px 14px;
-                border-bottom: 1px solid var(--line);
-                text-transform: uppercase;
-                letter-spacing: 0.12em;
+                background: var(--surface-alt);
             }
-
-            tbody tr {
-                border-bottom: 1px solid var(--line);
-                transition: background 180ms ease;
+            th, td {
+                padding: 12px 20px;
+                border-bottom: 1px solid var(--border);
             }
-
+            td {
+                font-size: .875rem;
+                vertical-align: top;
+                overflow-wrap: anywhere;
+                max-width: 360px;
+            }
+            tbody tr:last-child td {
+                border-bottom: 0;
+            }
             tbody tr:hover {
-                background: rgba(105, 192, 255, 0.11);
+                background: var(--surface-alt);
             }
-
-            tbody td {
-                padding: 11px 14px;
-                font-size: 0.91rem;
-                color: #e9efff;
-                vertical-align: middle;
-            }
-
             .status-pill {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 999px;
-                padding: 3px 10px;
-                font-size: 0.76rem;
-                font-weight: 600;
-                color: #f4f9ff;
-                background: rgba(34, 144, 235, 0.2);
-                border: 1px solid rgba(34, 144, 235, 0.4);
+                display: inline-block;
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                padding: 1px 7px;
+                font-size: .75rem;
+                white-space: nowrap;
+                color: var(--muted);
             }
-
             .status-pill.shard {
-                background: rgba(201, 121, 255, 0.2);
-                border-color: rgba(201, 121, 255, 0.38);
+                color: var(--accent);
             }
-
             .empty-state {
-                padding: 30px 18px;
+                padding: 36px 20px;
                 text-align: center;
                 color: var(--muted);
-                background: rgba(255, 255, 255, 0.03);
-                border-top: 1px solid var(--line);
             }
-
-            .light {
-                --bg: linear-gradient(
-                    180deg,
-                    #f8fbff 0%,
-                    #f3f7ff 40%,
-                    #edf4ff 100%
-                );
-                --surface: #fff;
-                --surface-alt: #f6f9ff;
-                --text: #102a46;
-                --muted: #4f637f;
-                --border: rgba(15, 31, 58, 0.12);
-                --line: #dfe9f5;
-                --shadow: 0 12px 22px rgba(4, 18, 44, 0.2);
-                --focus: #2f7be0;
+            footer {
+                color: var(--muted);
+                font-size: .8rem;
+                padding-bottom: 32px;
             }
-
-            .light .theme-toggle {
-                background: rgba(255, 255, 255, 0.9);
-                color: var(--text);
-                border-color: rgba(89, 105, 150, 0.21);
+            @media (max-width: 640px) {
+                body > header {
+                    padding-top: 80px;
+                    padding-right: 24px;
+                }
+                .theme-toggle {
+                    top: 20px;
+                }
+                .top-panel {
+                    grid-template-columns: 1fr;
+                    gap: 12px;
+                }
+                .panel {
+                    padding: 16px 20px;
+                }
+                .page {
+                    padding-top: 0;
+                }
             }
         </style>
     </head>
@@ -317,19 +278,19 @@
             type="button"
             aria-label="Toggle light/dark theme"
         >
-            <span id="themeToggleIcon" aria-hidden="true">🌙</span>
+            <span id="themeToggleIcon" aria-hidden="true">Light theme</span>
         </button>
 
         <header>
             <h1>Rekindled Hub</h1>
             <p class="subtitle">
-                Live status, health checks, and active server listing for the
-                Rekindled Server network.
+                Registered game servers, hub uptime, and supported client versions.
+                Data refreshes automatically while this page is open.
             </p>
         </header>
 
         <main id="dashboard" class="page">
-            <section class="top-panel" aria-label="Master Server metrics">
+            <section class="top-panel" aria-label="Hub metrics">
                 <article class="panel">
                     <h2>Active servers</h2>
                     <p class="metric" id="activeCount">
@@ -338,7 +299,7 @@
                     <small id="refreshInfo"></small>
                 </article>
                 <article class="panel">
-                    <h2>Master uptime</h2>
+                    <h2>Hub uptime</h2>
                     <p class="metric" id="uptime"><%= uptime %></p>
                     <small>Process uptime since service start</small>
                 </article>
@@ -347,7 +308,7 @@
                     aria-labelledby="oldestVersionLabel"
                     aria-describedby="oldestVersionDesc"
                 >
-                    <h2 id="oldestVersionLabel">Oldest version</h2>
+                    <h2 id="oldestVersionLabel">Minimum client version</h2>
                     <p class="metric" id="oldestVersionValue">
                         <%= status.oldestSupportedVersion %>
                     </p>
@@ -363,36 +324,31 @@
                 aria-live="polite"
                 aria-atomic="true"
             >
-                <span class="status-line" id="pollStatus">Status: ready</span>
-                <span class="status-line" id="allowedShardStatus"
-                    >Shards allowlist: <%=
-                    Array.isArray(status.shardingAllowList) &&
-                    status.shardingAllowList.length ?
-                    status.shardingAllowList.join(', ') : 'none' %></span
-                >
-                <span class="status-line" id="filtersStatus"
-                    >Filters: <%= Array.isArray(status.filters) &&
-                    status.filters.length ? status.filters.join(', ') : 'none'
-                    %></span
-                >
-                <span class="status-line" id="censorsStatus"
-                    >Censors: <%= Array.isArray(status.censors) &&
-                    status.censors.length ? status.censors.join(', ') : 'none'
-                    %></span
-                >
-                <a
-                    href="/api/v1/servers"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    >Raw JSON /api/v1/servers</a
-                >
+                <span class="status-line" id="pollStatus">Status: waiting for update</span>
+            </section>
+            <section class="configuration" aria-label="Server configuration">
+                <% const lists = [
+                    ...(Array.isArray(status.shardingAllowList) ? [["allowedShard", "Sharding allowlist", status.shardingAllowList]] : []),
+                    ["filters", "Filters", status.filters],
+                    ["censors", "Censors", status.censors]
+                ]; %>
+                <% lists.forEach(([id, label, values]) => { const entries = Array.isArray(values) ? values : []; %>
+                <details>
+                    <summary><%= label %><span class="count" id="<%= id %>Count">(<%= entries.length %>)</span></summary>
+                    <ul class="config-list" id="<%= id %>List" tabindex="0" aria-label="<%= label %>">
+                        <% if (!entries.length) { %><li>No entries configured.</li><% } %>
+                        <% entries.forEach(value => { %><li><%= value %></li><% }); %>
+                    </ul>
+                </details>
+                <% }); %>
             </section>
 
             <section class="server-list" aria-label="Active server list">
-                <header>Active servers</header>
+                <header><h2>Active servers</h2><a class="api-link" href="/api/v1/servers" target="_blank" rel="noopener noreferrer">View JSON</a></header>
                 <div id="serverLoading" class="empty-state">
                     Loading server list…
                 </div>
+                <div class="table-scroll" tabindex="0" role="region" aria-label="Active servers">
                 <table
                     id="serversTable"
                     hidden
@@ -409,35 +365,37 @@
                     </thead>
                     <tbody id="serversBody"></tbody>
                 </table>
+                </div>
                 <div id="serversEmpty" class="empty-state" hidden>
-                    No active servers at the moment. Add a server and it will
-                    appear here.
+                    No servers are currently registered with the hub.
                 </div>
             </section>
         </main>
 
-        <script type="application/json" id="dashboard-config">
-            <%= JSON.stringify({ pollIntervalMs }) %>
-        </script>
+        <footer>Rekindled Hub &middot; Server directory and service status</footer>
+        <script id="dashboard-config" type="application/json"><%- JSON.stringify({ pollIntervalMs }) %></script>
         <script>
             const THEME_KEY = "rekindled-hub:theme";
             const themeButton = document.getElementById("themeToggle");
             const themeIcon = document.getElementById("themeToggleIcon");
-            const getTheme = () => localStorage.getItem(THEME_KEY) || "dark";
+            const getTheme = () => {
+                try { return localStorage.getItem(THEME_KEY) || "dark"; }
+                catch { return document.documentElement.classList.contains("light") ? "light" : "dark"; }
+            };
 
             const setTheme = (theme) => {
                 document.documentElement.classList.toggle(
                     "light",
                     theme === "light",
                 );
-                themeIcon.textContent = theme === "light" ? "☀️" : "🌙";
+                themeIcon.textContent = theme === "light" ? "Dark theme" : "Light theme";
                 themeButton.setAttribute(
                     "aria-label",
                     theme === "light"
                         ? "Switch to dark theme"
                         : "Switch to light theme",
                 );
-                localStorage.setItem(THEME_KEY, theme);
+                try { localStorage.setItem(THEME_KEY, theme); } catch {}
             };
 
             themeButton.addEventListener("click", () =>
@@ -470,23 +428,17 @@
             };
 
             const updateServerInfo = (meta) => {
-                const shards =
-                    Array.isArray(meta?.shardingAllowList) &&
-                    meta.shardingAllowList.length
-                        ? meta.shardingAllowList.join(", ")
-                        : "none";
-                const filters =
-                    Array.isArray(meta?.filters) && meta.filters.length
-                        ? meta.filters.join(", ")
-                        : "none";
-                const censors =
-                    Array.isArray(meta?.censors) && meta.censors.length
-                        ? meta.censors.join(", ")
-                        : "none";
-
-                setText("allowedShardStatus", `Shards allowlist: ${shards}`);
-                setText("filtersStatus", `Filters: ${filters}`);
-                setText("censorsStatus", `Censors: ${censors}`);
+                [["allowedShard", meta?.shardingAllowList], ["filters", meta?.filters], ["censors", meta?.censors]].forEach(([id, values]) => {
+                    const list = document.getElementById(`${id}List`);
+                    if (!list) return;
+                    const entries = Array.isArray(values) ? values : [];
+                    setText(`${id}Count`, `(${entries.length})`);
+                    list.replaceChildren(...(entries.length ? entries : ["No entries configured."]).map(value => {
+                        const item = document.createElement("li");
+                        item.textContent = String(value);
+                        return item;
+                    }));
+                });
             };
 
             const safeString = (value, fallback = "") =>
@@ -597,42 +549,49 @@
                     setText("activeCount", json.statusData.activeServerCount);
                     setText("uptime", json.statusData.uptime);
                     updateServerInfo(json.statusData);
-                    setStatus(`Live (${new Date().toLocaleTimeString()})`);
+                    setText("oldestVersionValue", json.statusData.oldestSupportedVersion);
+                    return true;
                 } catch (error) {
                     console.warn("Status update error", error);
-                    setStatus("Error fetching status", "error");
+                    return false;
                 }
             };
 
             const fetchServers = async () => {
                 const loader = document.getElementById("serverLoading");
-                if (loader) {
-                    loader.hidden = false;
-                    loader.textContent = "Loading server list…";
-                }
-
                 try {
                     const res = await fetch("/api/v1/servers", {
                         cache: "no-store",
                     });
                     if (!res.ok) throw new Error("server fetch failed");
                     const json = await res.json();
-                    if (json.status !== "success")
+                    if (json.status !== "success" || !Array.isArray(json.servers))
                         throw new Error("server payload invalid");
 
                     renderRows(json.servers);
-                    setStatus(
-                        `Server list updated (${new Date().toLocaleTimeString()})`,
-                    );
+                    return true;
                 } catch (error) {
                     console.warn("Server list error", error);
-                    renderRows([]);
-                    setStatus("Error fetching servers", "error");
+                    if (!loader.hidden) loader.textContent = "Server list unavailable. Retrying automatically.";
+                    return false;
                 }
             };
 
+            let refreshing = false;
+            setText("refreshInfo", `Refreshes every ${POLL_INTERVAL_MS / 1000} seconds`);
             const refresh = async () => {
-                await Promise.all([fetchStatus(), fetchServers()]);
+                if (refreshing) return;
+                refreshing = true;
+                try {
+                    const results = await Promise.all([fetchStatus(), fetchServers()]);
+                    if (results.every(Boolean)) {
+                        setStatus(`Updated at ${new Date().toLocaleTimeString()}`);
+                    } else {
+                        setStatus("Refresh incomplete. Displayed data may be outdated. Retrying automatically.", "error");
+                    }
+                } finally {
+                    refreshing = false;
+                }
             };
 
             refresh();

@@ -1,7 +1,7 @@
 const assert = require("node:assert");
 const test = require("node:test");
 
-process.env.MASTER_SERVER_WRITE_SECRET = "test-secret";
+process.env.HUB_WRITE_SECRET = "test-secret";
 
 delete require.cache[require.resolve("../routes/api/v1/servers")];
 const servers = require("../routes/api/v1/servers");

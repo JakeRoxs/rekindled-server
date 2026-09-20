@@ -21,17 +21,28 @@ const {
 } = require("../../../utils/helpers");
 
 const serverTimeoutMs = config.serverTimeoutMs;
-const MASTER_SERVER_WRITE_SECRET = String(
-  process.env.MASTER_SERVER_WRITE_SECRET ?? "",
+const HUB_WRITE_SECRET = String(
+  process.env.HUB_WRITE_SECRET ?? "",
 ).trim();
 
-if (!MASTER_SERVER_WRITE_SECRET) {
+const HUB_ALLOW_UNAUTHENTICATED_REGISTRATION = String(
+  process.env.HUB_ALLOW_UNAUTHENTICATED_REGISTRATION ?? "",
+).trim().toLowerCase() === "true";
+
+if (HUB_ALLOW_UNAUTHENTICATED_REGISTRATION) {
+  console.warn(
+    "[HUB] HUB_ALLOW_UNAUTHENTICATED_REGISTRATION is enabled. " +
+      "Write operations will be allowed without authentication.",
+  );
+}
+
+if (!HUB_WRITE_SECRET && !HUB_ALLOW_UNAUTHENTICATED_REGISTRATION) {
   console.error(
-    "[MASTER SERVER] MASTER_SERVER_WRITE_SECRET is not configured. " +
+    "[HUB] HUB_WRITE_SECRET is not configured. " +
       "Write operations require this secret and the service will reject them.",
   );
   // Optional: throw to fail startup early instead of runtime 500 behavior.
-  // throw new Error("MASTER_SERVER_WRITE_SECRET is required");
+  // throw new Error("HUB_WRITE_SECRET is required");
 }
 
 const activeServers = new Map();
@@ -65,8 +76,8 @@ const censors = [];
 // This can be overridden via the SHARDING_ALLOWLIST environment variable (comma-separated).
 const shardingAllowList = (function () {
   const defaults = [
-    "https://rekindled-ds2s.jakeesws.xyz",
-    "https://rekindled-ds3.jakeesws.xyz",
+    "https://rekindled-ds2s.jakesws.xyz",
+    "https://rekindled-ds3.jakesws.xyz",
   ];
 
   const env = process.env.SHARDING_ALLOWLIST;
@@ -364,17 +375,21 @@ function getIsShardFromRequest(req) {
 const crypto = require("node:crypto");
 
 function requireWriteAuth(req, res) {
-  if (!MASTER_SERVER_WRITE_SECRET) {
+  if (HUB_ALLOW_UNAUTHENTICATED_REGISTRATION) {
+    return null;
+  }
+
+  if (!HUB_WRITE_SECRET) {
     sendError(res, 500, "Server write secret not configured");
     return res;
   }
 
   const providedSecret = String(
-    req.get("x-master-server-write-secret") ?? "",
+    req.get("x-hub-write-secret") ?? "",
   ).trim();
 
   const secretA = Buffer.from(providedSecret, "utf8");
-  const secretB = Buffer.from(MASTER_SERVER_WRITE_SECRET, "utf8");
+  const secretB = Buffer.from(HUB_WRITE_SECRET, "utf8");
 
   const length = Math.max(secretA.length, secretB.length);
   const paddedA = Buffer.alloc(length);
@@ -560,7 +575,7 @@ router.get("/", async (req, res) => {
 });
 
 // @route GET api/v1/servers/status
-// @description Get master server status info for dashboards.
+// @description Get hub status info for dashboards.
 // @access Public
 router.get("/status", statusLimiter, async (req, res) => {
   res.json({ status: "success", statusData: getStatus() });
@@ -760,7 +775,7 @@ function getStatus() {
   return {
     activeServerCount: activeServers.size,
     uptime: formatDuration(process.uptime() * 1000),
-    shardingAllowList: shardingAllowList,
+    ...(config.showShardingAllowList ? { shardingAllowList } : {}),
     filters: filters,
     censors: censors,
     oldestSupportedVersion: oldestSupportedVersion,

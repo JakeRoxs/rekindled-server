@@ -1,7 +1,7 @@
 const assert = require("node:assert");
 const test = require("node:test");
 
-process.env.MASTER_SERVER_WRITE_SECRET = "test-secret";
+process.env.HUB_WRITE_SECRET = "test-secret";
 
 delete require.cache[require.resolve("../routes/api/v1/servers")];
 const {
@@ -57,7 +57,7 @@ test("requireWriteAuth returns unauthorized for wrong header", () => {
 });
 
 test("requireWriteAuth returns null for a correct secret", () => {
-    const req = { get: () => process.env.MASTER_SERVER_WRITE_SECRET };
+    const req = { get: () => process.env.HUB_WRITE_SECRET };
     const res = makeRes();
     const authError = requireWriteAuth(req, res);
     assert.strictEqual(authError, null);

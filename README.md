@@ -143,7 +143,7 @@ The compose file uses the published images and binds each server's `Saved` direc
 
 ## Hub Server
 
-The hub (formerly the "master server") is a lightweight NodeJS service that game servers register with so the loader can discover them. Servers advertise themselves to a hub, and the loader queries a hub to build its server list.
+The hub is a lightweight NodeJS service that game servers register with so the loader can discover them. Servers advertise themselves to a hub, and the loader queries a hub to build its server list.
 
 - **Public hub:** By default the loader connects to the public hub at `rekindled.jakesws.xyz` (port `50020`). You can override this in the loader settings if you'd rather use a private or local hub.
 - **Host your own:** Uncomment the `rekindled-hub` service in `docker-compose.yml` (or run `nix run github:jakeroxs/rekindled-server#hub`) to run your own hub, then point your servers/loaders at it.
