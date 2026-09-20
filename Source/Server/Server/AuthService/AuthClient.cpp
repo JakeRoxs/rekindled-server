@@ -216,7 +216,7 @@ bool AuthClient::Poll() {
 
       if constexpr (BuildConfig::AUTH_ENABLED) {
         // Only validate Steam ticket if Steam API is available
-        if (Service->GetServer()->IsDefaultServer() && !Service->GetServer()->IsSteamAvailable()) {
+        if (!Service->GetServer()->IsSteamAvailable()) {
           WarningS(GetName().c_str(), "Skipping Steam ticket validation as Steam API is not available.");
         } else {
           double Start = GetHighResolutionSeconds();

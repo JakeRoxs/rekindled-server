@@ -1,5 +1,5 @@
 # build stage based on ubuntu LTS
-FROM ubuntu:26.04 AS build
+FROM ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78 AS build
 
 # install build dependencies without recommendations and clean apt cache in same layer
 RUN apt-get update && \
@@ -14,7 +14,7 @@ RUN cmake --preset linux-release -DBUILD_TESTING=OFF && \
     cmake --build --preset linux-release --target Server --parallel "$(nproc)"
 
 # runtime stage – also based on ubuntu LTS; allow STEAM_APP_ID to be overridden
-FROM ubuntu:26.04 AS runtime
+FROM ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78 AS runtime
 
 # default Steam AppID can be overridden with --build-arg STEAM_APP_ID=xxxx
 ARG STEAM_APP_ID=335300

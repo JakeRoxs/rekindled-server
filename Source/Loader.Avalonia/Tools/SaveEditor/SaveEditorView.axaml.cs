@@ -42,6 +42,7 @@ namespace Loader.Tools.SaveEditor
             public string CharName { get; set; } = "";
             public int SoulLevel { get; set; }
             public int PlaytimeSeconds { get; set; }
+            public int SlotIndex { get; set; }
             public string MenuData { get; set; } = "";
             public string SlotData { get; set; } = "";
         }
@@ -67,9 +68,9 @@ namespace Loader.Tools.SaveEditor
                         var menuData = Convert.FromBase64String(dto.MenuData);
                         var slotData = Convert.FromBase64String(dto.SlotData);
                         var slot = new SaveSlot(menuData, slotData);
-                        var card = CreateBankCard(slot, dtos.IndexOf(dto));
+                        var card = CreateBankCard(slot, dto.SlotIndex);
                         BankPanel.Children.Add(card);
-                        _bank.Add(new BankEntry(slot, card, dtos.IndexOf(dto)));
+                        _bank.Add(new BankEntry(slot, card, dto.SlotIndex));
                     }
                     catch (Exception) { /* Skip invalid entries */ }
                 }
@@ -91,6 +92,7 @@ namespace Loader.Tools.SaveEditor
                     CharName = e.Slot.CharName,
                     SoulLevel = e.Slot.SoulLevel,
                     PlaytimeSeconds = e.Slot.PlaytimeSeconds,
+                    SlotIndex = e.SlotIndex,
                     MenuData = Convert.ToBase64String(e.Slot.MenuData),
                     SlotData = Convert.ToBase64String(e.Slot.SlotData)
                 }).ToList();
