@@ -13,6 +13,7 @@
 #include "Shared/Core/Utils/Endian.h"
 
 #include <filesystem>
+#include <cstdint>
 
 #include <openssl/rsa.h>
 #include <openssl/pem.h>

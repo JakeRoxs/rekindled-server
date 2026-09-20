@@ -5,7 +5,10 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Loader.Tools.SaveEditor
@@ -14,6 +17,7 @@ namespace Loader.Tools.SaveEditor
     {
         private static readonly DataFormat<SaveSlot> SlotFormat = DataFormat.CreateInProcessFormat<SaveSlot>("slot");
         private static readonly DataFormat<string> FromFormat = DataFormat.CreateInProcessFormat<string>("from");
+        private const string SlotInfoClass = "slot-info";
 
         private DarkSoulsSave? _sourceSave;
         private DarkSoulsSave? _destSave;
@@ -22,7 +26,7 @@ namespace Loader.Tools.SaveEditor
         private bool _copyRight = true;
         private readonly List<BankEntry> _bank = new();
 
-        private class BankEntry
+        private sealed class BankEntry
         {
             public SaveSlot Slot { get; }
             public Border Card { get; }
@@ -35,6 +39,75 @@ namespace Loader.Tools.SaveEditor
             }
         }
 
+        private sealed class BankSlotDto
+        {
+            public string CharName { get; set; } = "";
+            public int SoulLevel { get; set; }
+            public int PlaytimeSeconds { get; set; }
+            public int SlotIndex { get; set; }
+            public string MenuData { get; set; } = "";
+            public string SlotData { get; set; } = "";
+        }
+
+        private static readonly JsonSerializerOptions BankJsonOptions = new() { WriteIndented = true };
+        private static readonly string BankPath = Path.Join(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "RekindledServer",
+            "save-editor-bank.json");
+
+        private void LoadBank()
+        {
+            if (!File.Exists(BankPath)) return;
+
+            try
+            {
+                var dtos = JsonSerializer.Deserialize<List<BankSlotDto>>(File.ReadAllText(BankPath));
+                if (dtos == null) return;
+
+                foreach (var dto in dtos)
+                {
+                    try
+                    {
+                        var menuData = Convert.FromBase64String(dto.MenuData);
+                        var slotData = Convert.FromBase64String(dto.SlotData);
+                        var slot = new SaveSlot(menuData, slotData);
+                        var card = CreateBankCard(slot, dto.SlotIndex);
+                        BankPanel.Children.Add(card);
+                        _bank.Add(new BankEntry(slot, card, dto.SlotIndex));
+                    }
+                    catch (FormatException) { /* Skip invalid entries */ }
+                    catch (ArgumentException) { /* Skip invalid entries */ }
+                }
+            }
+            catch (IOException) { /* Reset to empty if file is corrupted or unreadable */ }
+            catch (JsonException) { /* Reset to empty if file is corrupted */ }
+        }
+
+        private void SaveBank()
+        {
+            try
+            {
+                var directory = Path.GetDirectoryName(BankPath);
+                if (!string.IsNullOrWhiteSpace(directory))
+                    Directory.CreateDirectory(directory);
+
+                var dtos = _bank.Select(e => new BankSlotDto
+                {
+                    CharName = e.Slot.CharName,
+                    SoulLevel = e.Slot.SoulLevel,
+                    PlaytimeSeconds = e.Slot.PlaytimeSeconds,
+                    SlotIndex = e.SlotIndex,
+                    MenuData = Convert.ToBase64String(e.Slot.MenuData),
+                    SlotData = Convert.ToBase64String(e.Slot.SlotData)
+                }).ToList();
+
+                File.WriteAllText(BankPath, JsonSerializer.Serialize(dtos, BankJsonOptions));
+            }
+            catch (IOException) { /* Ignore save errors */ }
+            catch (UnauthorizedAccessException) { /* Ignore save errors */ }
+            catch (JsonException) { /* Ignore save errors */ }
+        }
+
         public SaveEditorView()
         {
             InitializeComponent();
@@ -42,6 +115,7 @@ namespace Loader.Tools.SaveEditor
             DragDrop.AddDropHandler(SourceDropPanel, SourcePanel_Drop);
             DragDrop.AddDragOverHandler(DestDropPanel, DestPanel_DragOver);
             DragDrop.AddDropHandler(DestDropPanel, DestPanel_Drop);
+            LoadBank();
         }
 
         private async void SourceLoadButton_OnClick(object? sender, RoutedEventArgs e)
@@ -150,7 +224,7 @@ namespace Loader.Tools.SaveEditor
             return files.FirstOrDefault();
         }
 
-        private int GetOccupiedSlotCount(DarkSoulsSave save)
+        private static int GetOccupiedSlotCount(DarkSoulsSave save)
         {
             return save.Menu.OccupiedSlots.Count(x => x);
         }
@@ -178,46 +252,30 @@ namespace Loader.Tools.SaveEditor
         {
             if (_sourceSave == null || _destSave == null) return;
 
-            var destNames = new HashSet<(string Name, int Level)>();
+            var destNames = CollectSlotNames(_destSave);
+            var sourceNames = CollectSlotNames(_sourceSave);
+
+            MarkDuplicateCards(SourceSlotsPanel, destNames);
+            MarkDuplicateCards(DestSlotsPanel, sourceNames);
+        }
+
+        private static HashSet<(string Name, int Level)> CollectSlotNames(DarkSoulsSave save)
+        {
+            var names = new HashSet<(string, int)>();
             for (int i = 0; i < 10; i++)
             {
-                if (_destSave.Menu.OccupiedSlots[i] && _destSave.Slots[i] != null)
-                {
-                    destNames.Add((_destSave.Slots[i].CharName, _destSave.Slots[i].SoulLevel));
-                }
+                if (save.Menu.OccupiedSlots[i] && save.Slots[i] != null)
+                    names.Add((save.Slots[i].CharName, save.Slots[i].SoulLevel));
             }
+            return names;
+        }
 
-            var sourceNames = new HashSet<(string Name, int Level)>();
-            for (int i = 0; i < 10; i++)
+        private static void MarkDuplicateCards(StackPanel panel, HashSet<(string Name, int Level)> names)
+        {
+            foreach (var child in panel.Children)
             {
-                if (_sourceSave.Menu.OccupiedSlots[i] && _sourceSave.Slots[i] != null)
-                {
-                    sourceNames.Add((_sourceSave.Slots[i].CharName, _sourceSave.Slots[i].SoulLevel));
-                }
-            }
-
-            foreach (var child in SourceSlotsPanel.Children)
-            {
-                if (child is Border card && card.Tag is SaveSlot slot)
-                {
-                    var key = (slot.CharName, slot.SoulLevel);
-                    if (destNames.Contains(key))
-                    {
-                        card.Classes.Add("duplicate");
-                    }
-                }
-            }
-
-            foreach (var child in DestSlotsPanel.Children)
-            {
-                if (child is Border card && card.Tag is SaveSlot slot)
-                {
-                    var key = (slot.CharName, slot.SoulLevel);
-                    if (sourceNames.Contains(key))
-                    {
-                        card.Classes.Add("duplicate");
-                    }
-                }
+                if (child is Border card && card.Tag is SaveSlot slot && names.Contains((slot.CharName, slot.SoulLevel)))
+                    card.Classes.Add("duplicate");
             }
         }
 
@@ -241,13 +299,13 @@ namespace Loader.Tools.SaveEditor
 
             var info = new StackPanel { Spacing = 4 };
             info.Children.Add(new TextBlock { Text = slot.CharName, Classes = { "slot-name" } });
-            info.Children.Add(new TextBlock { Text = $"Level {slot.SoulLevel} | Slot {index}", Classes = { "slot-info" } });
+            info.Children.Add(new TextBlock { Text = $"Level {slot.SoulLevel} | Slot {index}", Classes = { SlotInfoClass } });
 
             var timeSpan = System.TimeSpan.FromSeconds(slot.PlaytimeSeconds);
             info.Children.Add(new TextBlock
             {
                 Text = $"Playtime: {timeSpan.Days}d {timeSpan.Hours}h {timeSpan.Minutes}m",
-                Classes = { "slot-info" }
+                Classes = { SlotInfoClass }
             });
 
             Grid.SetColumn(info, 0);
@@ -255,7 +313,7 @@ namespace Loader.Tools.SaveEditor
 
             var actions = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 8 };
             var selectBtn = new Button { Content = "Select", Classes = { "slot-action" } };
-            selectBtn.Click += (s, e) => SelectSlot(slot, card, isSource);
+            selectBtn.Click += (s, e) => SelectSlot(slot, card);
             actions.Children.Add(selectBtn);
 
             var bankBtn = new Button { Content = "→ Bank", Classes = { "slot-action" } };
@@ -288,7 +346,7 @@ namespace Loader.Tools.SaveEditor
                 RefreshSlots(DestSlotsPanel, save, false);
         }
 
-        private void SelectSlot(SaveSlot slot, Border card, bool isSource)
+        private void SelectSlot(SaveSlot slot, Border card)
         {
             if (_selectedSlotBorder != null)
             {
@@ -304,6 +362,7 @@ namespace Loader.Tools.SaveEditor
             var card = CreateBankCard(slot, slotIndex);
             BankPanel.Children.Add(card);
             _bank.Add(new BankEntry(slot, card, slotIndex));
+            SaveBank();
         }
 
         private Border CreateBankCard(SaveSlot slot, int slotIndex)
@@ -326,8 +385,8 @@ namespace Loader.Tools.SaveEditor
 
             var info = new StackPanel { Spacing = 2 };
             info.Children.Add(new TextBlock { Text = slot.CharName, Classes = { "slot-name" } });
-            info.Children.Add(new TextBlock { Text = $"Level {slot.SoulLevel}", Classes = { "slot-info" } });
-            info.Children.Add(new TextBlock { Text = $"From Slot {slotIndex}", Classes = { "slot-info" } });
+            info.Children.Add(new TextBlock { Text = $"Level {slot.SoulLevel}", Classes = { SlotInfoClass } });
+            info.Children.Add(new TextBlock { Text = $"From Slot {slotIndex}", Classes = { SlotInfoClass } });
 
             Grid.SetColumn(info, 0);
             grid.Children.Add(info);
@@ -343,7 +402,7 @@ namespace Loader.Tools.SaveEditor
             actions.Children.Add(toDestBtn);
 
             var deleteBtn = new Button { Content = "✕", Classes = { "bank-btn" } };
-            deleteBtn.Click += (s, e) => RemoveFromBank(card, slot);
+            deleteBtn.Click += (s, e) => RemoveFromBank(card);
             actions.Children.Add(deleteBtn);
 
             Grid.SetColumn(actions, 1);
@@ -353,10 +412,11 @@ namespace Loader.Tools.SaveEditor
             return card;
         }
 
-        private void RemoveFromBank(Border card, SaveSlot slot)
+        private void RemoveFromBank(Border card)
         {
             BankPanel.Children.Remove(card);
             _bank.RemoveAll(entry => entry.Card == card);
+            SaveBank();
         }
 
         private void LoadBankSlotToSave(SaveSlot slot, DarkSoulsSave? save, StackPanel panel, bool isSource)
@@ -403,6 +463,7 @@ namespace Loader.Tools.SaveEditor
         {
             BankPanel.Children.Clear();
             _bank.Clear();
+            SaveBank();
         }
 
         private void CopyRightButton_OnClick(object? sender, RoutedEventArgs e)
@@ -410,7 +471,7 @@ namespace Loader.Tools.SaveEditor
             if (_selectedSlot == null) return;
 
             DarkSoulsSave? source, dest;
-            StackPanel sourcePanel, destPanel;
+            StackPanel destPanel;
             TextBlock destTextBlock;
             TextBlock slotCountText;
 
@@ -418,7 +479,6 @@ namespace Loader.Tools.SaveEditor
             {
                 source = _sourceSave;
                 dest = _destSave;
-                sourcePanel = SourceSlotsPanel;
                 destPanel = DestSlotsPanel;
                 destTextBlock = DestPathText;
                 slotCountText = DestSlotCountText;
@@ -427,7 +487,6 @@ namespace Loader.Tools.SaveEditor
             {
                 source = _destSave;
                 dest = _sourceSave;
-                sourcePanel = DestSlotsPanel;
                 destPanel = SourceSlotsPanel;
                 destTextBlock = SourcePathText;
                 slotCountText = SourceSlotCountText;
@@ -466,7 +525,7 @@ namespace Loader.Tools.SaveEditor
         private void MoveAllButton_OnClick(object? sender, RoutedEventArgs e)
         {
             DarkSoulsSave? source, dest;
-            StackPanel sourcePanel, destPanel;
+            StackPanel destPanel;
             TextBlock destTextBlock;
             TextBlock slotCountText;
 
@@ -474,7 +533,6 @@ namespace Loader.Tools.SaveEditor
             {
                 source = _sourceSave;
                 dest = _destSave;
-                sourcePanel = SourceSlotsPanel;
                 destPanel = DestSlotsPanel;
                 destTextBlock = DestPathText;
                 slotCountText = DestSlotCountText;
@@ -483,7 +541,6 @@ namespace Loader.Tools.SaveEditor
             {
                 source = _destSave;
                 dest = _sourceSave;
-                sourcePanel = DestSlotsPanel;
                 destPanel = SourceSlotsPanel;
                 destTextBlock = SourcePathText;
                 slotCountText = SourceSlotCountText;
@@ -524,37 +581,19 @@ namespace Loader.Tools.SaveEditor
             destTextBlock.Text = copied > 0 ? $"Copied {copied} character(s)" : "No empty slots in destination";
         }
 
-        private SaveSlot? GetDraggedSlot(DragEventArgs e)
+        private static SaveSlot? GetDraggedSlot(DragEventArgs e)
         {
-            foreach (var item in e.DataTransfer.Items)
-            {
-                foreach (var format in item.Formats)
-                {
-                    if (format.Equals(SlotFormat))
-                    {
-                        return (SaveSlot?)item.TryGetRaw(SlotFormat);
-                    }
-                }
-            }
-            return null;
+            var item = e.DataTransfer.Items.FirstOrDefault(i => i.Formats.Contains(SlotFormat));
+            return item == null ? null : (SaveSlot?)item.TryGetRaw(SlotFormat);
         }
 
-        private string? GetDraggedFrom(DragEventArgs e)
+        private static string? GetDraggedFrom(DragEventArgs e)
         {
-            foreach (var item in e.DataTransfer.Items)
-            {
-                foreach (var format in item.Formats)
-                {
-                    if (format.Equals(FromFormat))
-                    {
-                        return (string?)item.TryGetRaw(FromFormat);
-                    }
-                }
-            }
-            return null;
+            var item = e.DataTransfer.Items.FirstOrDefault(i => i.Formats.Contains(FromFormat));
+            return item == null ? null : (string?)item.TryGetRaw(FromFormat);
         }
 
-        private void SourcePanel_DragOver(object? sender, DragEventArgs e)
+        private static void SourcePanel_DragOver(object? sender, DragEventArgs e)
         {
             if (e.DataTransfer.Formats.Contains(SlotFormat))
                 e.DragEffects = DragDropEffects.Copy;
@@ -562,7 +601,7 @@ namespace Loader.Tools.SaveEditor
                 e.DragEffects = DragDropEffects.None;
         }
 
-        private void DestPanel_DragOver(object? sender, DragEventArgs e)
+        private static void DestPanel_DragOver(object? sender, DragEventArgs e)
         {
             if (e.DataTransfer.Formats.Contains(SlotFormat))
                 e.DragEffects = DragDropEffects.Copy;
@@ -612,6 +651,7 @@ namespace Loader.Tools.SaveEditor
                 {
                     BankPanel.Children.Remove(entry.Card);
                     _bank.Remove(entry);
+                    SaveBank();
                 }
             }
             else if (_destSave != null)
@@ -662,6 +702,7 @@ namespace Loader.Tools.SaveEditor
                 {
                     BankPanel.Children.Remove(entry.Card);
                     _bank.Remove(entry);
+                    SaveBank();
                 }
             }
             else if (_sourceSave != null)
@@ -707,6 +748,7 @@ namespace Loader.Tools.SaveEditor
             ExitSteamIdEditSource();
         }
 
+        [SuppressMessage("SonarQube", "S2325", Justification = "Uses XAML-generated instance fields not visible to analyzer")]
         private void ExitSteamIdEditSource()
         {
             SourceSteamIdText.IsVisible = true;
@@ -753,6 +795,7 @@ namespace Loader.Tools.SaveEditor
             ExitSteamIdEditDest();
         }
 
+        [SuppressMessage("SonarQube", "S2325", Justification = "Uses XAML-generated instance fields not visible to analyzer")]
         private void ExitSteamIdEditDest()
         {
             DestSteamIdText.IsVisible = true;
@@ -762,7 +805,7 @@ namespace Loader.Tools.SaveEditor
             DestSteamIdCancelButton.IsVisible = false;
         }
 
-        private void ShowSaveSuccess(TextBlock textBlock)
+        private static void ShowSaveSuccess(TextBlock textBlock)
         {
             textBlock.IsVisible = true;
             Task.Delay(2500).ContinueWith(t =>

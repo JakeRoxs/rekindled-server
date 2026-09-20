@@ -12,6 +12,7 @@
 
 #include <vector>
 #include "Server/GameService/Utils/DS3_GameIds.h"
+#include <cstdint>
 
 class DS3_BloodMessageData {
 public:

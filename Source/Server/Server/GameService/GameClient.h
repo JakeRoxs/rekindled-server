@@ -15,6 +15,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cstdint>
 
 class GameService;
 class NetConnection;

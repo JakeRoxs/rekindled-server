@@ -16,6 +16,7 @@
 #include "Protobuf/SharedProtobufs.h"
 
 #include <unordered_map>
+#include <cstdint>
 
 class Cipher;
 class Game;

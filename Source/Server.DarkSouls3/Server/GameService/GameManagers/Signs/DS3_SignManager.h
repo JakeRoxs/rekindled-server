@@ -15,6 +15,7 @@
 #include "Server/Database/DatabaseTypes.h"
 #include "Server.DarkSouls3/Protobuf/DS3_Protobufs.h"
 #include "Server.DarkSouls3/Server/GameService/Utils/DS3_GameIds.h"
+#include <cstdint>
 
 struct Frpg2ReliableUdpMessage;
 class Server;

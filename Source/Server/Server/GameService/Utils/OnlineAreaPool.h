@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <iterator>
 #include <vector>
+#include <cstdint>
 #include <functional>
 
 // Super simple cache split up spatially based on the online area.

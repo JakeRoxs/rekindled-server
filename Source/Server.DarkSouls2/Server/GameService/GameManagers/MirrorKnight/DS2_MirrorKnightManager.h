@@ -16,6 +16,7 @@
 #include "Server.DarkSouls2/Protobuf/DS2_Protobufs.h"
 #include "Server.DarkSouls2/Server/GameService/Utils/DS2_GameIds.h"
 #include "Server.DarkSouls2/Server/GameService/Utils/DS2_CellAndAreaId.h"
+#include <cstdint>
 
 struct Frpg2ReliableUdpMessage;
 class Server;

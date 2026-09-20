@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <functional>
 #include <variant>
+#include <cstdint>
 
 #include "Server/Database/DatabaseTypes.h"
 

@@ -120,7 +120,16 @@ jakeroxs/rekindled-hub - This is for the hub server, eventually hub servers will
 
 If you want a quick one-liner to run the server, you can use this. Note that it mounts the Saved folder to the host filesystem at /opt/rekindled-server/Saved, making it easier to modify the configuration files. Access /opt/rekindled-server/Saved to view and modify the configuration files.
 
-`sudo mkdir -p /opt/rekindled-server/Saved && sudo chown 1000:1000 /opt/rekindled-server/Saved && sudo docker run -d -m 2G --restart always --net host --mount type=bind,source=/opt/rekindled-server/Saved,target=/opt/rekindled-server/Saved jakeroxs/rekindled-server:latest`
+`sudo mkdir -p /opt/rekindled-server/Saved && sudo chown 1000:1000 /opt/rekindled-server/Saved && sudo docker run -d -m 2G --restart always --net host --mount type=bind,source=/opt/rekindled-server/Saved,target=/opt/rekindled-ds3-server/Saved jakeroxs/rekindled-ds3-server:latest`
+
+The DS2 and DS3 images run as `1000:1000`. Prepare the Compose data directories on your Docker host:
+
+```bash
+mkdir -p Saved-ds3 Saved-ds2
+sudo chown -R 1000:1000 Saved-ds3 Saved-ds2
+```
+
+Remove any `user: root` override. View server logs with `docker logs -f rekindled-ds3-server`.
 
 ### Docker Compose example
 
@@ -130,7 +139,7 @@ A `docker-compose.yml` file is included in the repository root with a simple con
 docker compose up -d
 ```
 
-The compose file uses the published images and binds the `Saved` directory to `./Saved` on the host. Adjust ports or enable the hub service if you want to host your own hub server/site.
+The compose file uses the published images and binds each server's `Saved` directory to `./Saved-ds3` or `./Saved-ds2` on the host. Adjust ports or enable the hub service if you want to host your own hub server/site.
 
 ## Hub Server
 

@@ -12,6 +12,7 @@
 
 #include "Server/Streams/Frpg2ReliableUdpPacketStream.h"
 #include "Server/Streams/Frpg2ReliableUdpFragment.h"
+#include <cstdint>
 
 class RSAKeyPair;
 class Cipher;

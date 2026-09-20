@@ -14,6 +14,7 @@
 #include "Server/Streams/Frpg2ReliableUdpMessageStream.h"
 #include "Server/GameService/GameService.h"
 #include "Server/GameService/PlayerState.h"
+#include <cstdint>
 
 // This is an interface class that wraps any game-specific functionality.
 

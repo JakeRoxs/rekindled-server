@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <functional>
 #include <mutex>
+#include <cstdint>
 
 class Server;
 class GameClient;

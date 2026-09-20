@@ -14,6 +14,7 @@
 #include "Server/GameService/PlayerState.h"
 
 #include <mutex>
+#include <cstdint>
 
 // /statistics
 //
