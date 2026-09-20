@@ -13,6 +13,27 @@ WORKDIR /build
 RUN cmake --preset linux-release -DBUILD_TESTING=OFF && \
     cmake --build --preset linux-release --target Server --parallel "$(nproc)"
 
+# Fetch Valve's dedicated-server runtime separately from the application build.
+FROM ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78 AS steam-runtime
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates curl lib32gcc-s1 lib32stdc++6 && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /opt/steamcmd /opt/steam-runtime /home/rekindled && \
+    chown 1000:1000 /opt/steamcmd /opt/steam-runtime /home/rekindled
+ENV HOME=/home/rekindled
+USER 1000:1000
+WORKDIR /opt/steamcmd
+RUN curl --fail --show-error --location --retry 3 \
+        https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
+        --output steamcmd_linux.tar.gz && \
+    tar -xzf steamcmd_linux.tar.gz && \
+    ./steamcmd.sh +@ShutdownOnFailedCommand 1 +@NoPromptForPassword 1 \
+        +force_install_dir /opt/steam-runtime +login anonymous \
+        +app_update 1007 validate +quit && \
+    test -s /opt/steam-runtime/linux64/steamclient.so
+
 # runtime stage – also based on ubuntu LTS; allow STEAM_APP_ID to be overridden
 FROM ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78 AS runtime
 
@@ -26,7 +47,7 @@ RUN mkdir -p /opt/rekindled-ds3-server/Saved /home/rekindled \
     && chmod 755 /opt/rekindled-ds3-server/Saved /opt/rekindled-ds3-server /home/rekindled \
     && apt update \
     # Healthcheck needs curl to check the server
-    && apt install -y --no-install-recommends --reinstall ca-certificates curl \
+    && apt install -y --no-install-recommends --reinstall ca-certificates curl libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 # expose the various ports the game server uses so operators can easily publish them
 #   50000/udp – DS3 game traffic (also used for quickmatch/arena)
@@ -39,6 +60,14 @@ EXPOSE 50005/tcp
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD curl -fsS http://localhost:50005/ || exit 1
 
+# Steam loads steamclient.so dynamically from HOME/.steam/sdk64.
+# Copy the complete 64-bit redistributable directory to retain companion libraries.
+COPY --from=steam-runtime --chown=1000:1000 /opt/steam-runtime/linux64/ /home/rekindled/.steam/sdk64/
+RUN LD_LIBRARY_PATH=/home/rekindled/.steam/sdk64 \
+    ldd /home/rekindled/.steam/sdk64/steamclient.so > /tmp/steam-dependencies.txt && \
+    cat /tmp/steam-dependencies.txt && \
+    ! grep -q "not found" /tmp/steam-dependencies.txt
+
 # write the AppID from build arg
 ENV STEAM_APP_ID=${STEAM_APP_ID}
 USER 1000:1000
@@ -48,7 +77,7 @@ RUN echo "$STEAM_APP_ID" > /opt/rekindled-ds3-server/steam_appid.txt
 # Keep the runtime image small by avoiding a full /build copy.
 COPY --from=build --chown=1000:1000 /build/intermediate/cmake/linux-release/bin/Release/. /opt/rekindled-ds3-server/
 
-ENV LD_LIBRARY_PATH="/opt/rekindled-ds3-server"
+ENV LD_LIBRARY_PATH="/opt/rekindled-ds3-server:/home/rekindled/.steam/sdk64"
 
 WORKDIR /opt/rekindled-ds3-server
 ENTRYPOINT ["/opt/rekindled-ds3-server/Server"]
